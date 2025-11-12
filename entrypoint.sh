@@ -10,9 +10,9 @@ if [ ! -d "$WORKSPACE_DIR" ]; then
   mkdir -p "$WORKSPACE_DIR"
 fi
 
-# Setup Claude Code configuration if CLAUDE_CODE_CONFIG_JSON is provided
-if [ -n "$CLAUDE_CODE_CONFIG_JSON" ]; then
-  echo "🔐 Setting up Claude Code configuration..."
+# Setup Claude Code credentials if CLAUDE_CODE_CREDENTIALS_JSON is provided
+if [ -n "$CLAUDE_CODE_CREDENTIALS_JSON" ]; then
+  echo "🔐 Setting up Claude Code credentials..."
 
   # Create .claude directory if it doesn't exist
   CLAUDE_DIR="${HOME}/.claude"
@@ -20,18 +20,18 @@ if [ -n "$CLAUDE_CODE_CONFIG_JSON" ]; then
     mkdir -p "$CLAUDE_DIR"
   fi
 
-  # Write the config JSON to config.json
-  CONFIG_FILE="${CLAUDE_DIR}/config.json"
-  echo "$CLAUDE_CODE_CONFIG_JSON" > "$CONFIG_FILE"
-  echo "✅ Configuration set up at: $CONFIG_FILE"
+  # Write the credentials JSON to .credentials.json
+  CREDENTIALS_FILE="${CLAUDE_DIR}/.credentials.json"
+  echo "$CLAUDE_CODE_CREDENTIALS_JSON" > "$CREDENTIALS_FILE"
+  echo "✅ Credentials set up at: $CREDENTIALS_FILE"
 
   # Validate JSON format
-  if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
-    echo "❌ Error: CLAUDE_CODE_CONFIG_JSON is not valid JSON"
+  if ! jq empty "$CREDENTIALS_FILE" 2>/dev/null; then
+    echo "❌ Error: CLAUDE_CODE_CREDENTIALS_JSON is not valid JSON"
     exit 1
   fi
 else
-  echo "⚠️  Warning: CLAUDE_CODE_CONFIG_JSON not set. Claude Code authentication may not work."
+  echo "⚠️  Warning: CLAUDE_CODE_CREDENTIALS_JSON not set. Claude Code authentication may not work."
 fi
 
 # Change to the app directory

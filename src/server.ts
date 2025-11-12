@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { Agent, AgentOptions } from '@anthropic-ai/claude-agent-sdk';
+import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { randomUUID } from 'crypto';
 
 const app = express();
@@ -11,21 +11,19 @@ const WORKSPACE_DIR = process.env.WORKSPACE_DIR || '/workspace';
 app.use(cors());
 app.use(express.json());
 
-// Store active sessions
-const activeSessions = new Map<string, Agent>();
+// Store active session IDs (for tracking purposes)
+const activeSessions = new Set<string>();
 
 /**
- * Initialize Claude Agent with workspace configuration
- * Authentication is handled via .claude/config.json set up by CLAUDE_CODE_CONFIG_JSON
+ * Create options for Claude Agent query
+ * Authentication is handled via .claude/.credentials.json set up by CLAUDE_CODE_CREDENTIALS_JSON
  */
-function createAgent(sessionId: string, customWorkspace?: string): Agent {
-  const agentOptions: AgentOptions = {
+function createQueryOptions(customWorkspace?: string): Options {
+  return {
     model: 'claude-sonnet-4-5-20250929',
-    workingDirectory: customWorkspace || WORKSPACE_DIR,
+    cwd: customWorkspace || WORKSPACE_DIR,
     systemPrompt: `You are Claude Code, running in a containerized environment. The working directory is ${customWorkspace || WORKSPACE_DIR}.`,
   };
-
-  return new Agent(agentOptions);
 }
 
 /**
@@ -47,8 +45,7 @@ app.post('/api/sessions', async (req: Request, res: Response) => {
     const sessionId = randomUUID();
     const { workspace } = req.body;
 
-    const agent = createAgent(sessionId, workspace);
-    activeSessions.set(sessionId, agent);
+    activeSessions.add(sessionId);
 
     res.json({
       sessionId,
@@ -94,16 +91,14 @@ app.get('/api/sessions', (req: Request, res: Response) => {
  */
 app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
   const { sessionId } = req.params;
-  const { prompt } = req.body;
+  const { prompt, workspace } = req.body;
 
   if (!prompt) {
     res.status(400).json({ error: 'Prompt is required' });
     return;
   }
 
-  const agent = activeSessions.get(sessionId);
-
-  if (!agent) {
+  if (!activeSessions.has(sessionId)) {
     res.status(404).json({ error: 'Session not found. Create a session first.' });
     return;
   }
@@ -118,38 +113,21 @@ app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
 
   try {
-    // Run the agent with the prompt
-    const result = await agent.run(prompt, {
-      onMessage: (message) => {
-        // Stream each message to the client
-        res.write(`data: ${JSON.stringify({
-          type: 'message',
-          content: message,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-      onToolUse: (toolUse) => {
-        // Stream tool usage information
-        res.write(`data: ${JSON.stringify({
-          type: 'tool_use',
-          tool: toolUse,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-      onError: (error) => {
-        // Stream error information
-        res.write(`data: ${JSON.stringify({
-          type: 'error',
-          error: error.message,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-    });
+    const options = createQueryOptions(workspace);
+    const queryStream = query({ prompt, options });
 
-    // Send completion message with final result
+    // Stream messages from the query
+    for await (const message of queryStream) {
+      res.write(`data: ${JSON.stringify({
+        type: 'message',
+        content: message,
+        timestamp: new Date().toISOString(),
+      })}\n\n`);
+    }
+
+    // Send completion message
     res.write(`data: ${JSON.stringify({
       type: 'completed',
-      result,
       timestamp: new Date().toISOString(),
     })}\n\n`);
 
@@ -187,37 +165,22 @@ app.post('/api/execute', async (req: Request, res: Response) => {
   const tempSessionId = randomUUID();
 
   try {
-    const agent = createAgent(tempSessionId, workspace);
-
     res.write(`data: ${JSON.stringify({ type: 'connected', sessionId: tempSessionId })}\n\n`);
 
-    const result = await agent.run(prompt, {
-      onMessage: (message) => {
-        res.write(`data: ${JSON.stringify({
-          type: 'message',
-          content: message,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-      onToolUse: (toolUse) => {
-        res.write(`data: ${JSON.stringify({
-          type: 'tool_use',
-          tool: toolUse,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-      onError: (error) => {
-        res.write(`data: ${JSON.stringify({
-          type: 'error',
-          error: error.message,
-          timestamp: new Date().toISOString(),
-        })}\n\n`);
-      },
-    });
+    const options = createQueryOptions(workspace);
+    const queryStream = query({ prompt, options });
+
+    // Stream messages from the query
+    for await (const message of queryStream) {
+      res.write(`data: ${JSON.stringify({
+        type: 'message',
+        content: message,
+        timestamp: new Date().toISOString(),
+      })}\n\n`);
+    }
 
     res.write(`data: ${JSON.stringify({
       type: 'completed',
-      result,
       timestamp: new Date().toISOString(),
     })}\n\n`);
 

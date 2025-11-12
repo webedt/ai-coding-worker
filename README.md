@@ -21,7 +21,7 @@ A TypeScript-based SSE (Server-Sent Events) streaming API server that provides a
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CLAUDE_CODE_CONFIG_JSON` | Yes | JSON string containing Claude Code configuration (including API key) |
+| `CLAUDE_CODE_CREDENTIALS_JSON` | Yes | JSON string containing Claude Code credentials (OAuth tokens or API key) |
 | `PORT` | No | Server port (default: 3000) |
 | `WORKSPACE_DIR` | No | Workspace directory (default: /workspace) |
 
@@ -39,7 +39,7 @@ docker build -t claude-code-sse-api .
 docker run -d \
   --name claude-api \
   -p 3000:3000 \
-  -e CLAUDE_CODE_CONFIG_JSON='{"apiKey": "sk-ant-your-api-key-here"}' \
+  -e CLAUDE_CODE_CREDENTIALS_JSON='{"claudeAiOauth":{"accessToken":"sk-ant-oat01-...","refreshToken":"sk-ant-ort01-...","expiresAt":1234567890,"scopes":["user:inference","user:profile"]}}' \
   -v $(pwd)/workspace:/workspace \
   claude-code-sse-api
 ```
@@ -293,7 +293,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - CLAUDE_CODE_CONFIG_JSON=${CLAUDE_CODE_CONFIG_JSON}
+      - CLAUDE_CODE_CREDENTIALS_JSON=${CLAUDE_CODE_CREDENTIALS_JSON}
       - PORT=3000
       - WORKSPACE_DIR=/workspace
     volumes:
@@ -303,8 +303,8 @@ services:
 
 Run with:
 ```bash
-# Set your config in .env file or export it
-export CLAUDE_CODE_CONFIG_JSON='{"apiKey": "sk-ant-your-key"}'
+# Set your credentials in .env file or export it
+export CLAUDE_CODE_CREDENTIALS_JSON='{"claudeAiOauth":{...}}'
 docker-compose up -d
 ```
 
@@ -331,9 +331,9 @@ docker logs claude-api
 ```
 
 Common issues:
-- Missing `CLAUDE_CODE_CONFIG_JSON` environment variable
-- Invalid `CLAUDE_CODE_CONFIG_JSON` format (must be valid JSON)
-- Missing `apiKey` field in the config JSON
+- Missing `CLAUDE_CODE_CREDENTIALS_JSON` environment variable
+- Invalid `CLAUDE_CODE_CREDENTIALS_JSON` format (must be valid JSON)
+- Missing OAuth credentials or invalid format
 - Port 3000 already in use
 
 ### SSE connection drops
