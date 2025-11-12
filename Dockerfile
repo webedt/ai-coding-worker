@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/install.sh | sh
+# Install Claude Code CLI (using bash since the script requires it)
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Set working directory for the application
 WORKDIR /app
