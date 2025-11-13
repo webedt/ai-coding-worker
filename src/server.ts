@@ -14,6 +14,9 @@ app.use(express.json());
 // Store active session IDs (for tracking purposes)
 const activeSessions = new Set<string>();
 
+// Track server status (idle/busy)
+let serverStatus: 'idle' | 'busy' = 'idle';
+
 /**
  * Create options for Claude Agent query
  * Authentication is handled via .claude/.credentials.json set up by CLAUDE_CODE_CREDENTIALS_JSON
@@ -35,6 +38,16 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     workspace: WORKSPACE_DIR,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * Status endpoint - returns whether server is idle or busy
+ */
+app.get('/status', (req: Request, res: Response) => {
+  res.json({
+    status: serverStatus,
     timestamp: new Date().toISOString(),
   });
 });
@@ -149,6 +162,7 @@ app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
 
 /**
  * One-off execution endpoint (no session required)
+ * For ephemeral containers: Sets status to busy, executes job, then exits process
  */
 app.post('/api/execute', async (req: Request, res: Response) => {
   const { prompt, workspace, dangerouslySkipPermissions } = req.body;
@@ -157,6 +171,9 @@ app.post('/api/execute', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'Prompt is required' });
     return;
   }
+
+  // Set status to busy
+  serverStatus = 'busy';
 
   // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -187,6 +204,10 @@ app.post('/api/execute', async (req: Request, res: Response) => {
     })}\n\n`);
 
     res.end();
+
+    // Exit process after successful completion (for ephemeral container model)
+    console.log('Job completed successfully. Exiting process...');
+    setTimeout(() => process.exit(0), 1000);
   } catch (error) {
     console.error('Error during execution:', error);
 
@@ -197,6 +218,10 @@ app.post('/api/execute', async (req: Request, res: Response) => {
     })}\n\n`);
 
     res.end();
+
+    // Exit process after error (for ephemeral container model)
+    console.log('Job failed. Exiting process...');
+    setTimeout(() => process.exit(1), 1000);
   }
 });
 
@@ -206,12 +231,14 @@ app.post('/api/execute', async (req: Request, res: Response) => {
 app.listen(PORT, () => {
   console.log(`🚀 Claude Code SSE API Server running on port ${PORT}`);
   console.log(`📁 Workspace directory: ${WORKSPACE_DIR}`);
+  console.log(`📊 Status: ${serverStatus}`);
   console.log(`\nAvailable endpoints:`);
   console.log(`  GET  /health`);
+  console.log(`  GET  /status`);
   console.log(`  POST /api/sessions`);
   console.log(`  GET  /api/sessions`);
   console.log(`  POST /api/stream/:sessionId`);
-  console.log(`  POST /api/execute`);
+  console.log(`  POST /api/execute (exits process when complete)`);
   console.log(`  DELETE /api/sessions/:sessionId`);
 });
 

@@ -18,7 +18,8 @@ services:
       - ./workspace:/workspace
       # Optional: Mount custom config directory
       # - ./claude-config:/root/.claude
-    restart: unless-stopped
+    # Restart policy: 'no' for ephemeral containers, 'unless-stopped' for persistent
+    restart: "no"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
