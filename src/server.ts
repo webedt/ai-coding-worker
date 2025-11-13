@@ -18,11 +18,13 @@ const activeSessions = new Set<string>();
  * Create options for Claude Agent query
  * Authentication is handled via .claude/.credentials.json set up by CLAUDE_CODE_CREDENTIALS_JSON
  */
-function createQueryOptions(customWorkspace?: string): Options {
+function createQueryOptions(customWorkspace?: string, skipPermissions?: boolean): Options {
   return {
     model: 'claude-sonnet-4-5-20250929',
     cwd: customWorkspace || WORKSPACE_DIR,
     systemPrompt: `You are Claude Code, running in a containerized environment. The working directory is ${customWorkspace || WORKSPACE_DIR}.`,
+    allowDangerouslySkipPermissions: skipPermissions ?? true,
+    permissionMode: (skipPermissions ?? true) ? 'bypassPermissions' : 'default',
   };
 }
 
@@ -91,7 +93,7 @@ app.get('/api/sessions', (req: Request, res: Response) => {
  */
 app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
   const { sessionId } = req.params;
-  const { prompt, workspace } = req.body;
+  const { prompt, workspace, dangerouslySkipPermissions } = req.body;
 
   if (!prompt) {
     res.status(400).json({ error: 'Prompt is required' });
@@ -113,7 +115,7 @@ app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
 
   try {
-    const options = createQueryOptions(workspace);
+    const options = createQueryOptions(workspace, dangerouslySkipPermissions);
     const queryStream = query({ prompt, options });
 
     // Stream messages from the query
@@ -149,7 +151,7 @@ app.post('/api/stream/:sessionId', async (req: Request, res: Response) => {
  * One-off execution endpoint (no session required)
  */
 app.post('/api/execute', async (req: Request, res: Response) => {
-  const { prompt, workspace } = req.body;
+  const { prompt, workspace, dangerouslySkipPermissions } = req.body;
 
   if (!prompt) {
     res.status(400).json({ error: 'Prompt is required' });
@@ -167,7 +169,7 @@ app.post('/api/execute', async (req: Request, res: Response) => {
   try {
     res.write(`data: ${JSON.stringify({ type: 'connected', sessionId: tempSessionId })}\n\n`);
 
-    const options = createQueryOptions(workspace);
+    const options = createQueryOptions(workspace, dangerouslySkipPermissions);
     const queryStream = query({ prompt, options });
 
     // Stream messages from the query

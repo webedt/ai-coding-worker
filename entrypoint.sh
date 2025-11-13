@@ -15,7 +15,7 @@ if [ -n "$CLAUDE_CODE_CREDENTIALS_JSON" ]; then
   echo "🔐 Setting up Claude Code credentials..."
 
   # Create .claude directory if it doesn't exist
-  CLAUDE_DIR="${HOME}/.claude"
+  CLAUDE_DIR="${HOME:=/home/claude}/.claude"
   if [ ! -d "$CLAUDE_DIR" ]; then
     mkdir -p "$CLAUDE_DIR"
   fi
