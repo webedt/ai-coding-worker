@@ -9,7 +9,7 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - CLAUDE_CODE_CONFIG_JSON=${CLAUDE_CODE_CONFIG_JSON}
+      - CLAUDE_CODE_CREDENTIALS_JSON=${CLAUDE_CODE_CREDENTIALS_JSON}
       - PORT=3000
       - WORKSPACE_DIR=/workspace
       - NODE_ENV=production
