@@ -47,6 +47,7 @@ export class GitHubClient {
 
   /**
    * Clone a new repository
+   * Implements fallback: tries requested branch, then falls back to default branch
    */
   private async cloneRepository(
     repoUrl: string,
@@ -56,14 +57,42 @@ export class GitHubClient {
   ): Promise<GitHubPullResult> {
     const cloneUrl = accessToken ? this.injectToken(repoUrl, accessToken) : repoUrl;
 
-    const cloneOptions: string[] = [];
-    if (branch) {
-      cloneOptions.push('--branch', branch);
+    let actualBranch = branch || 'main';
+    let usedFallback = false;
+
+    try {
+      // Try cloning with specified branch
+      const cloneOptions: string[] = [];
+      if (branch) {
+        cloneOptions.push('--branch', branch);
+      }
+
+      await this.git.clone(cloneUrl, targetPath, cloneOptions);
+      console.log(`[GitHubClient] Cloned ${repoUrl} (branch: ${actualBranch})`);
+    } catch (error) {
+      // If branch doesn't exist, try cloning default branch
+      if (branch && error instanceof Error && error.message.includes('Remote branch')) {
+        console.warn(`[GitHubClient] Branch '${branch}' not found, falling back to default branch`);
+
+        try {
+          // Clone without specifying branch (uses default)
+          await this.git.clone(cloneUrl, targetPath);
+
+          // Detect the actual default branch
+          const repoGit = simpleGit(targetPath);
+          const status = await repoGit.status();
+          actualBranch = status.current || 'main';
+          usedFallback = true;
+
+          console.log(`[GitHubClient] Cloned using default branch: ${actualBranch}`);
+        } catch (fallbackError) {
+          console.error('[GitHubClient] Failed to clone with default branch:', fallbackError);
+          throw fallbackError;
+        }
+      } else {
+        throw error;
+      }
     }
-
-    await this.git.clone(cloneUrl, targetPath, cloneOptions);
-
-    const actualBranch = branch || 'main';
 
     return {
       targetPath,

@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 import { ExecuteRequest, SSEEvent, SessionMetadata } from './types';
 import { GitHubClient } from './clients/githubClient';
 import { DBClient } from './clients/dbClient';
@@ -83,11 +84,73 @@ export class Orchestrator {
         // Get the provider session ID for resume
         providerSessionId = metadata.providerSessionId;
 
-        // Use execution workspace (may be in cloned repo subdirectory)
+        // Get execution workspace path
         workspacePath = this.sessionManager.getExecutionWorkspace(sessionId);
 
         console.log(`[Orchestrator] Loaded session metadata:`, metadata);
         console.log(`[Orchestrator] Workspace path: ${workspacePath}`);
+
+        // Check if workspace actually exists (resilience for pruned volumes)
+        if (!fs.existsSync(workspacePath)) {
+          console.warn(`[Orchestrator] Workspace missing for session ${sessionId}, attempting recovery...`);
+
+          // Recovery Strategy: Re-clone from GitHub if we have the metadata
+          if (metadata.github) {
+            sendEvent({
+              type: 'message',
+              message: `Workspace missing, recovering from GitHub: ${metadata.github.repoUrl}`,
+              timestamp: new Date().toISOString()
+            });
+
+            const sessionRoot = this.sessionManager.getSessionWorkspace(sessionId);
+
+            try {
+              // Try to re-clone the repository
+              const pullResult = await this.githubClient.pullRepository({
+                repoUrl: metadata.github.repoUrl,
+                branch: metadata.github.branch,
+                directory: metadata.github.clonedPath,
+                workspaceRoot: sessionRoot
+              });
+
+              workspacePath = pullResult.targetPath;
+
+              // Update metadata if branch changed (fallback to default)
+              if (pullResult.branch !== metadata.github.branch) {
+                console.warn(
+                  `[Orchestrator] Branch '${metadata.github.branch}' not found, ` +
+                  `recovered using branch '${pullResult.branch}'`
+                );
+                metadata.github.branch = pullResult.branch;
+                this.sessionManager.saveMetadata(sessionId, metadata);
+              }
+
+              sendEvent({
+                type: 'github_pull_progress',
+                data: {
+                  type: 'completed',
+                  message: `Workspace recovered from GitHub (branch: ${pullResult.branch})`,
+                  targetPath: workspacePath
+                },
+                timestamp: new Date().toISOString()
+              });
+
+              console.log(`[Orchestrator] Workspace recovered: ${workspacePath}`);
+            } catch (recoveryError) {
+              console.error('[Orchestrator] Failed to recover workspace from GitHub:', recoveryError);
+              throw new Error(
+                `Cannot resume session: workspace missing and recovery failed. ` +
+                `Original error: ${recoveryError instanceof Error ? recoveryError.message : 'Unknown'}`
+              );
+            }
+          } else {
+            // No GitHub metadata - cannot recover
+            throw new Error(
+              `Cannot resume session: workspace missing and no GitHub metadata available for recovery. ` +
+              `The session workspace may have been pruned.`
+            );
+          }
+        }
       } else {
         // Create new session
         console.log(`[Orchestrator] Creating new session: ${sessionId}`);
