@@ -1,7 +1,7 @@
 {
-  "name": "unified-worker",
+  "name": "ai-coding-worker",
   "version": "1.0.0",
-  "description": "Unified coding assistant worker with multi-provider support",
+  "description": "Scalable AI coding assistant API with Docker Swarm orchestration, multi-provider support, and GitHub integration",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

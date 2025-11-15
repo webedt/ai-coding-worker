@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Test runner for unified-worker
+ * Test runner for ai-coding-worker
  * Reads credentials from .env and sends test requests
  */
 

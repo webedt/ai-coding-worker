@@ -28,8 +28,8 @@ RUN npm run build
 USER worker
 
 # Configure Git identity for commits
-RUN git config --global user.email "worker@unified-worker.local" && \
-    git config --global user.name "Unified Worker"
+RUN git config --global user.email "worker@ai-coding-worker.local" && \
+    git config --global user.name "AI Coding Worker"
 
 # Set environment variables
 ENV PORT=5000

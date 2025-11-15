@@ -18,9 +18,9 @@ services:
       timeout: 20s
       retries: 3
 
-  unified-worker:
+  ai-coding-worker:
     build: .
-    image: unified-worker:latest
+    image: ai-coding-worker:latest
     ports:
       - "5001:5000"
     environment:
