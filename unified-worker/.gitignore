@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.env
-*.log
-.DS_Store
-.claude/
-
-# Test files with credentials
-test-with-auth.json
