@@ -282,8 +282,7 @@ Sessions are persisted to MinIO with the following structure:
 sessions/
 └── session-{uuid}/
     ├── .session-metadata.json    # Session info, provider ID, GitHub metadata
-    ├── response/
-    │   └── stream-events.jsonl   # SSE event log (JSONL format)
+    ├── .stream-events.jsonl      # SSE event log (JSONL format)
     ├── .claude/                  # Claude state (if using ClaudeAgentSDK)
     └── {repo-name}/              # Cloned repository (if GitHub used)
 ```
