@@ -7,3 +7,5 @@ dist/
 
 # Test files with credentials
 test-with-auth.json
+test-resume-minio.json
+test-resume-session.json
