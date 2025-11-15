@@ -4,7 +4,7 @@ export interface ExecuteRequest {
   // Required fields
   userRequest: string;
   codingAssistantProvider: string;
-  codingAssistantAccessToken: string;
+  codingAssistantAuthentication: string;
 
   // Optional: Session management
   resumeSessionId?: string;

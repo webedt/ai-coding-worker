@@ -1,4 +1,5 @@
 import { BaseProvider, ProviderOptions, ProviderStreamEvent } from './BaseProvider';
+import { CredentialManager } from '../utils/credentialManager';
 
 /**
  * Codex provider for Cursor/OpenAI Codex integration
@@ -7,8 +8,11 @@ import { BaseProvider, ProviderOptions, ProviderStreamEvent } from './BaseProvid
  * integration will be added when the SDK is available.
  */
 export class CodexProvider extends BaseProvider {
-  constructor(accessToken: string, workspace: string) {
-    super(accessToken, workspace);
+  constructor(authentication: string, workspace: string) {
+    super(authentication, workspace);
+
+    // Write authentication to ~/.codex/auth.json
+    CredentialManager.writeCodexCredentials(authentication);
   }
 
   async execute(
@@ -43,8 +47,13 @@ export class CodexProvider extends BaseProvider {
   }
 
   async validateToken(): Promise<boolean> {
-    // TODO: Implement actual token validation
-    return this.accessToken !== '';
+    try {
+      const credPath = CredentialManager.getCodexCredentialPath();
+      return CredentialManager.credentialFileExists(credPath);
+    } catch (error) {
+      console.error('[CodexProvider] Token validation failed:', error);
+      return false;
+    }
   }
 
   getProviderName(): string {

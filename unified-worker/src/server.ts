@@ -184,11 +184,11 @@ app.post('/execute', async (req: Request, res: Response) => {
     return;
   }
 
-  if (!request.codingAssistantAccessToken) {
+  if (!request.codingAssistantAuthentication) {
     const error: APIError = {
       error: 'invalid_request',
-      message: 'Missing required field: codingAssistantAccessToken',
-      field: 'codingAssistantAccessToken'
+      message: 'Missing required field: codingAssistantAuthentication',
+      field: 'codingAssistantAuthentication'
     };
     res.status(400).json(error);
     return;

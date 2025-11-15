@@ -1,5 +1,6 @@
 import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { BaseProvider, ProviderOptions, ProviderStreamEvent } from './BaseProvider';
+import { CredentialManager } from '../utils/credentialManager';
 
 /**
  * Claude Code provider implementation
@@ -7,9 +8,12 @@ import { BaseProvider, ProviderOptions, ProviderStreamEvent } from './BaseProvid
 export class ClaudeCodeProvider extends BaseProvider {
   private model: string;
 
-  constructor(accessToken: string, workspace: string, model?: string) {
-    super(accessToken, workspace);
+  constructor(authentication: string, workspace: string, model?: string) {
+    super(authentication, workspace);
     this.model = model || 'claude-sonnet-4-5-20250929';
+
+    // Write authentication to ~/.claude/.credentials.json
+    CredentialManager.writeClaudeCredentials(authentication);
   }
 
   /**
@@ -45,15 +49,17 @@ export class ClaudeCodeProvider extends BaseProvider {
   }
 
   /**
-   * Validate Claude Code access token
-   * Note: The SDK handles authentication via credentials file
-   * This is a placeholder for future token validation
+   * Validate Claude Code authentication
+   * Verifies that credentials are written to ~/.claude/.credentials.json
    */
   async validateToken(): Promise<boolean> {
-    // The Claude Agent SDK reads from .claude/.credentials.json
-    // which is set up via CLAUDE_CODE_CREDENTIALS_JSON environment variable
-    // For now, we'll assume it's valid if the environment is set up correctly
-    return true;
+    try {
+      const credPath = CredentialManager.getClaudeCredentialPath();
+      return CredentialManager.credentialFileExists(credPath);
+    } catch (error) {
+      console.error('[ClaudeCodeProvider] Token validation failed:', error);
+      return false;
+    }
   }
 
   /**

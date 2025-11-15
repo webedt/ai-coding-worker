@@ -266,7 +266,7 @@ export class Orchestrator {
 
       const provider = ProviderFactory.createProvider(
         request.codingAssistantProvider,
-        request.codingAssistantAccessToken,
+        request.codingAssistantAuthentication,
         workspacePath,
         request.providerOptions
       );
@@ -275,7 +275,7 @@ export class Orchestrator {
       await provider.execute(
         request.userRequest,
         {
-          accessToken: request.codingAssistantAccessToken,
+          authentication: request.codingAssistantAuthentication,
           workspace: workspacePath,
           resumeSessionId: providerSessionId, // Use provider's internal session ID
           providerOptions: request.providerOptions
@@ -381,8 +381,8 @@ export class Orchestrator {
       throw new Error('codingAssistantProvider is required');
     }
 
-    if (!request.codingAssistantAccessToken || request.codingAssistantAccessToken.trim() === '') {
-      throw new Error('codingAssistantAccessToken is required');
+    if (!request.codingAssistantAuthentication || request.codingAssistantAuthentication.trim() === '') {
+      throw new Error('codingAssistantAuthentication is required');
     }
 
     if (!ProviderFactory.isProviderSupported(request.codingAssistantProvider)) {

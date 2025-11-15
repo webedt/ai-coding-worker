@@ -1,7 +1,7 @@
 import { ExecuteRequest } from '../types';
 
 export interface ProviderOptions {
-  accessToken: string;
+  authentication: string;
   workspace: string;
   resumeSessionId?: string;
   providerOptions?: Record<string, any>;
@@ -16,11 +16,11 @@ export interface ProviderStreamEvent {
  * Base interface for all coding assistant providers
  */
 export abstract class BaseProvider {
-  protected accessToken: string;
+  protected authentication: string;
   protected workspace: string;
 
-  constructor(accessToken: string, workspace: string) {
-    this.accessToken = accessToken;
+  constructor(authentication: string, workspace: string) {
+    this.authentication = authentication;
     this.workspace = workspace;
   }
 

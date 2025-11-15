@@ -11,7 +11,7 @@ export class ProviderFactory {
    */
   static createProvider(
     providerName: string,
-    accessToken: string,
+    authentication: string,
     workspace: string,
     options?: Record<string, any>
   ): BaseProvider {
@@ -20,11 +20,13 @@ export class ProviderFactory {
     switch (normalizedName) {
       case 'claude-code':
       case 'claude':
-        return new ClaudeCodeProvider(accessToken, workspace, options?.model);
+      case 'claudeagentsdk':
+        return new ClaudeCodeProvider(authentication, workspace, options?.model);
 
       case 'codex':
       case 'cursor':
-        return new CodexProvider(accessToken, workspace);
+      case 'codexsdk':
+        return new CodexProvider(authentication, workspace);
 
       // Future providers:
       // case 'copilot':
@@ -44,7 +46,7 @@ export class ProviderFactory {
    * Get list of supported providers
    */
   static getSupportedProviders(): string[] {
-    return ['claude-code', 'codex', 'cursor'];
+    return ['claude-code', 'claude', 'claudeagentsdk', 'codex', 'cursor', 'codexsdk'];
   }
 
   /**
