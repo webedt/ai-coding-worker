@@ -603,6 +603,11 @@ export class Orchestrator {
         return parsed.claudeAiOauth.accessToken;
       }
 
+      // Unwrapped OAuth format: { accessToken: "...", refreshToken: "..." }
+      if (parsed.accessToken) {
+        return parsed.accessToken;
+      }
+
       // Plain API key in object: { apiKey: "..." }
       if (parsed.apiKey) {
         return parsed.apiKey;
