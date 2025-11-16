@@ -179,6 +179,23 @@ app.post('/execute', async (req: Request, res: Response) => {
   console.log(`[Worker] Provider: ${request.codingAssistantProvider}`);
   console.log(`[Worker] Request: ${request.userRequest.substring(0, 100)}...`);
 
+  // Log full request parameters for debugging
+  console.log('[Worker] Full request payload:');
+  console.log('  - userRequest:', request.userRequest);
+  console.log('  - codingAssistantProvider:', request.codingAssistantProvider);
+  console.log('  - codingAssistantAuthentication type:', typeof request.codingAssistantAuthentication);
+  console.log('  - codingAssistantAuthentication value:', JSON.stringify(request.codingAssistantAuthentication).substring(0, 200) + '...');
+  console.log('  - resumeSessionId:', request.resumeSessionId || 'N/A');
+  console.log('  - github:', request.github ? JSON.stringify(request.github) : 'N/A');
+  console.log('  - database:', request.database ? 'Configured' : 'N/A');
+  console.log('  - providerOptions:', request.providerOptions ? JSON.stringify(request.providerOptions) : 'N/A');
+
+  // Normalize codingAssistantAuthentication to string (handle both object and string formats)
+  if (typeof request.codingAssistantAuthentication === 'object') {
+    console.log('[Worker] Converting codingAssistantAuthentication from object to string');
+    request.codingAssistantAuthentication = JSON.stringify(request.codingAssistantAuthentication);
+  }
+
   // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
