@@ -26,6 +26,29 @@ let workerStatus: 'idle' | 'busy' = 'idle';
 // Create orchestrator instance
 const orchestrator = new Orchestrator(TMP_DIR, DB_BASE_URL);
 
+/**
+ * Redact sensitive tokens from logs
+ * @param value - Value to redact (string or object)
+ * @returns Redacted value
+ */
+function redactSensitiveData(value: any): string {
+  if (!value) return 'N/A';
+
+  const str = typeof value === 'string' ? value : JSON.stringify(value);
+
+  // Redact OAuth access tokens (sk-ant-oat01-...)
+  const redacted = str
+    .replace(/sk-ant-oat01-[A-Za-z0-9_-]+/g, 'sk-ant-oat01-***REDACTED***')
+    .replace(/sk-ant-ort01-[A-Za-z0-9_-]+/g, 'sk-ant-ort01-***REDACTED***')
+    .replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-***REDACTED***')
+    .replace(/gho_[A-Za-z0-9_-]+/g, 'gho_***REDACTED***')
+    .replace(/ghp_[A-Za-z0-9_-]+/g, 'ghp_***REDACTED***')
+    .replace(/"accessToken":"[^"]+"/g, '"accessToken":"***REDACTED***"')
+    .replace(/"refreshToken":"[^"]+"/g, '"refreshToken":"***REDACTED***"');
+
+  return redacted;
+}
+
 // Initialize orchestrator (MinIO bucket setup)
 orchestrator.initialize().catch(err => {
   console.error('[Server] Failed to initialize orchestrator:', err);
@@ -179,14 +202,14 @@ app.post('/execute', async (req: Request, res: Response) => {
   console.log(`[Worker] Provider: ${request.codingAssistantProvider}`);
   console.log(`[Worker] Request: ${request.userRequest.substring(0, 100)}...`);
 
-  // Log full request parameters for debugging
+  // Log full request parameters for debugging (with redaction)
   console.log('[Worker] Full request payload:');
   console.log('  - userRequest:', request.userRequest);
   console.log('  - codingAssistantProvider:', request.codingAssistantProvider);
   console.log('  - codingAssistantAuthentication type:', typeof request.codingAssistantAuthentication);
-  console.log('  - codingAssistantAuthentication value:', JSON.stringify(request.codingAssistantAuthentication).substring(0, 200) + '...');
+  console.log('  - codingAssistantAuthentication value:', redactSensitiveData(request.codingAssistantAuthentication).substring(0, 200) + '...');
   console.log('  - resumeSessionId:', request.resumeSessionId || 'N/A');
-  console.log('  - github:', request.github ? JSON.stringify(request.github) : 'N/A');
+  console.log('  - github:', request.github ? redactSensitiveData(request.github) : 'N/A');
   console.log('  - database:', request.database ? 'Configured' : 'N/A');
   console.log('  - providerOptions:', request.providerOptions ? JSON.stringify(request.providerOptions) : 'N/A');
 

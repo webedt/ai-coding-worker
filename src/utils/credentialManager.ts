@@ -80,8 +80,34 @@ export class CredentialManager {
     // Parse authentication if it's JSON, otherwise treat as plain API key
     let credentials: any;
     try {
-      credentials = JSON.parse(authentication);
-      // If it's valid JSON, write it as-is (could be OAuth structure or other format)
+      const parsed = JSON.parse(authentication);
+
+      // Check if it's already in the correct format with claudeAiOauth wrapper
+      if (parsed.claudeAiOauth) {
+        credentials = parsed;
+      }
+      // Check if it's raw OAuth tokens that need to be wrapped
+      else if (parsed.accessToken && parsed.refreshToken) {
+        // Frontend sent OAuth tokens without wrapper - add it
+        credentials = {
+          claudeAiOauth: {
+            accessToken: parsed.accessToken,
+            refreshToken: parsed.refreshToken,
+            expiresAt: parsed.expiresAt || (Date.now() + 86400000), // Default to 24h if not provided
+            scopes: parsed.scopes || ['user:inference', 'user:profile'],
+            subscriptionType: parsed.subscriptionType || 'max'
+          }
+        };
+        console.log('[CredentialManager] Wrapped OAuth tokens in claudeAiOauth format');
+      }
+      // Check if it's a plain API key in object format
+      else if (parsed.apiKey) {
+        credentials = parsed;
+      }
+      // Unknown format, write as-is and let SDK handle it
+      else {
+        credentials = parsed;
+      }
     } catch {
       // Not JSON, treat as plain API key
       credentials = {
