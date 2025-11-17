@@ -38,7 +38,7 @@ services:
           memory: 512M
 
   ai-coding-worker:
-    image: ai-coding-worker:latest
+    image: dockerregistry.etdofresh.com/ai-coding-worker:latest
     ports:
       - target: 5000
         published: 5001

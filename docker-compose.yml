@@ -20,7 +20,7 @@ services:
 
   ai-coding-worker:
     build: .
-    image: ai-coding-worker:latest
+    image: dockerregistry.etdofresh.com/ai-coding-worker:latest
     ports:
       - "5001:5000"
     environment:
