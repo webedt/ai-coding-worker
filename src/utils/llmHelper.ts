@@ -4,12 +4,20 @@ import { logger } from './logger';
 /**
  * Helper for making one-off LLM requests for metadata generation
  * Uses Haiku for fast, cost-effective responses
+ * Supports both API keys and OAuth tokens
  */
 export class LLMHelper {
   private client: Anthropic;
 
-  constructor(apiKey: string) {
-    this.client = new Anthropic({ apiKey });
+  constructor(authToken: string) {
+    // Detect if OAuth token (starts with sk-ant-oat) or API key (starts with sk-ant-api)
+    if (authToken.startsWith('sk-ant-oat')) {
+      // OAuth token - use authToken parameter
+      this.client = new Anthropic({ authToken });
+    } else {
+      // API key - use apiKey parameter
+      this.client = new Anthropic({ apiKey: authToken });
+    }
   }
 
   /**
