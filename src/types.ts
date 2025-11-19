@@ -1,8 +1,34 @@
 // Request/Response types for unified API
 
+/**
+ * Image block for user messages
+ * Supports base64-encoded images in various formats
+ */
+export interface ImageBlock {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+    data: string; // base64-encoded image data
+  };
+}
+
+/**
+ * Text block for user messages
+ */
+export interface TextBlock {
+  type: 'text';
+  text: string;
+}
+
+/**
+ * User request content - can be simple string or structured with images
+ */
+export type UserRequestContent = string | Array<TextBlock | ImageBlock>;
+
 export interface ExecuteRequest {
   // Required fields
-  userRequest: string;
+  userRequest: UserRequestContent;
   codingAssistantProvider: string;
   codingAssistantAuthentication: string;
 

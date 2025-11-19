@@ -200,11 +200,18 @@ app.post('/execute', async (req: Request, res: Response) => {
   workerStatus = 'busy';
   console.log(`[Worker] Status: busy - Starting execution`);
   console.log(`[Worker] Provider: ${request.codingAssistantProvider}`);
-  console.log(`[Worker] Request: ${request.userRequest.substring(0, 100)}...`);
+
+  // Handle logging for both string and structured content
+  const requestPreview = typeof request.userRequest === 'string'
+    ? request.userRequest.substring(0, 100)
+    : `[Structured content with ${request.userRequest.length} blocks]`;
+  console.log(`[Worker] Request: ${requestPreview}...`);
 
   // Log full request parameters for debugging (with redaction)
   console.log('[Worker] Full request payload:');
-  console.log('  - userRequest:', request.userRequest);
+  console.log('  - userRequest:', typeof request.userRequest === 'string'
+    ? request.userRequest
+    : `[Structured content with ${request.userRequest.length} blocks - ${request.userRequest.filter(b => b.type === 'image').length} images]`);
   console.log('  - codingAssistantProvider:', request.codingAssistantProvider);
   console.log('  - codingAssistantAuthentication type:', typeof request.codingAssistantAuthentication);
   console.log('  - codingAssistantAuthentication value:', redactSensitiveData(request.codingAssistantAuthentication).substring(0, 200) + '...');
