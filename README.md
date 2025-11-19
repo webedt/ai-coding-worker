@@ -174,6 +174,31 @@ docker service logs unified-worker-stack_unified-worker -f
 docker service scale unified-worker-stack_unified-worker=20
 ```
 
+### Redeploy (Update Code)
+
+When you update the code and need to redeploy:
+
+```bash
+# 1. Build TypeScript
+npm run build
+
+# 2. Build and push Docker image
+docker build -t dockerregistry.etdofresh.com/ai-coding-worker:latest .
+docker push dockerregistry.etdofresh.com/ai-coding-worker:latest
+
+# 3. Update the service (rolling update)
+docker service update --image dockerregistry.etdofresh.com/ai-coding-worker:latest webedt-app-ai-coding-workers-gy4wew_ai-coding-worker
+```
+
+Or use the automated script:
+
+```bash
+# For local registry (adjust registry URL as needed)
+./redeploy.sh
+```
+
+The service will perform a rolling update (2 workers at a time by default) with zero downtime.
+
 ### Stop
 
 ```bash
