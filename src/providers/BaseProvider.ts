@@ -1,4 +1,4 @@
-import { ExecuteRequest } from '../types';
+import { ExecuteRequest, UserRequestContent } from '../types';
 
 export interface ProviderOptions {
   authentication: string;
@@ -26,12 +26,12 @@ export abstract class BaseProvider {
 
   /**
    * Execute a user request and stream results
-   * @param userRequest The user's prompt/instruction
+   * @param userRequest The user's prompt/instruction (can be simple string or structured with images)
    * @param options Provider-specific options
    * @param onEvent Callback for each streaming event
    */
   abstract execute(
-    userRequest: string,
+    userRequest: UserRequestContent,
     options: ProviderOptions,
     onEvent: (event: ProviderStreamEvent) => void
   ): Promise<void>;

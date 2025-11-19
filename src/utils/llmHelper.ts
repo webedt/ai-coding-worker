@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './logger';
+import { UserRequestContent } from '../types';
 
 /**
  * Helper for making one-off LLM requests for metadata generation
@@ -21,11 +22,38 @@ export class LLMHelper {
   }
 
   /**
+   * Extract text from UserRequestContent
+   * If it's a string, return as-is
+   * If it's structured content, concatenate all text blocks
+   */
+  private extractTextFromRequest(userRequest: UserRequestContent): string {
+    if (typeof userRequest === 'string') {
+      return userRequest;
+    }
+
+    // Extract text from all text blocks
+    return userRequest
+      .filter(block => block.type === 'text')
+      .map(block => (block as any).text)
+      .join(' ')
+      .trim();
+  }
+
+  /**
    * Generate a concise session name from user request
    * Example: "Create a hello.txt file" -> "Create hello.txt file"
+   * Supports both string and structured content (with images)
    */
-  async generateSessionName(userRequest: string): Promise<string> {
+  async generateSessionName(userRequest: UserRequestContent): Promise<string> {
     try {
+      // Extract text from request (handles both string and structured content)
+      const requestText = this.extractTextFromRequest(userRequest);
+
+      // If no text found, use a default
+      if (!requestText) {
+        return 'New Session';
+      }
+
       const response = await this.client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 100,
@@ -34,7 +62,7 @@ export class LLMHelper {
             role: 'user',
             content: `Generate a concise session name (max 60 characters) from this user request. The name should be descriptive but brief, suitable for a session title. Only return the session name, nothing else.
 
-User request: ${userRequest}
+User request: ${requestText}
 
 Session name:`
           }
@@ -56,7 +84,7 @@ Session name:`
 
       logger.info('Generated session name', {
         component: 'LLMHelper',
-        userRequest: userRequest.substring(0, 100),
+        userRequest: requestText.substring(0, 100),
         sessionName: cleanName
       });
 
@@ -65,8 +93,9 @@ Session name:`
       logger.error('Failed to generate session name', error, {
         component: 'LLMHelper'
       });
-      // Fallback: truncate user request
-      return userRequest.substring(0, 60).trim();
+      // Fallback: truncate user request text
+      const requestText = this.extractTextFromRequest(userRequest);
+      return requestText ? requestText.substring(0, 60).trim() : 'New Session';
     }
   }
 

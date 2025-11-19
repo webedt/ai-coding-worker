@@ -235,6 +235,73 @@ case 'new-provider':
 
 Passed via `providerOptions` in request payload.
 
+## Image Support
+
+The AI Coding Worker now supports sending images to Claude Code along with text prompts. This enables visual analysis, screenshot debugging, and multimodal interactions.
+
+### Request Format
+
+The `userRequest` field can be either:
+
+1. **Simple string** (text-only):
+```json
+{
+  "userRequest": "Create a hello.txt file with greeting message",
+  "codingAssistantProvider": "claude-code",
+  "codingAssistantAuthentication": "..."
+}
+```
+
+2. **Structured content** (text + images):
+```json
+{
+  "userRequest": [
+    {
+      "type": "text",
+      "text": "What's in this screenshot? Please analyze and fix any issues."
+    },
+    {
+      "type": "image",
+      "source": {
+        "type": "base64",
+        "media_type": "image/png",
+        "data": "iVBORw0KGgoAAAANSUhEUg..."
+      }
+    }
+  ],
+  "codingAssistantProvider": "claude-code",
+  "codingAssistantAuthentication": "..."
+}
+```
+
+### Supported Image Formats
+
+- `image/jpeg` - JPEG images
+- `image/png` - PNG images
+- `image/gif` - GIF images
+- `image/webp` - WebP images
+
+All images must be base64-encoded.
+
+### Example Use Cases
+
+1. **Screenshot Analysis**: Send screenshots of UI bugs for debugging
+2. **Design Implementation**: Send mockups for code generation
+3. **Error Debugging**: Send error screenshots for analysis
+4. **Documentation**: Send diagrams or charts for explanation
+
+### Example Request
+
+See `test-image-request.json.example` for a complete example.
+
+```bash
+# Test image request
+curl -X POST http://localhost:5000/execute \
+  -H "Content-Type: application/json" \
+  -d @test-image-request.json \
+  --no-buffer
+```
+
 ## Testing
 
 Test files demonstrate different scenarios:
@@ -243,6 +310,7 @@ Test files demonstrate different scenarios:
 - `test-resume.json` - Session resume
 - `test-new-session.json` - New session creation
 - `test-recovery.json` - Workspace recovery
+- `test-image-request.json.example` - Image support example (multimodal)
 - `test-requests.sh` - Automated test script
 
 Never commit `test-with-auth.json` (contains real credentials).

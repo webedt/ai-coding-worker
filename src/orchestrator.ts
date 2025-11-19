@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExecuteRequest, SSEEvent, SessionMetadata } from './types';
+import { ExecuteRequest, SSEEvent, SessionMetadata, UserRequestContent } from './types';
 import { GitHubClient } from './clients/githubClient';
 import { DBClient } from './clients/dbClient';
 import { SessionStorage } from './storage/sessionStorage';
@@ -26,6 +26,28 @@ export class Orchestrator {
     this.githubClient = new GitHubClient();
     this.dbClient = new DBClient(dbBaseUrl);
     this.sessionStorage = new SessionStorage();
+  }
+
+  /**
+   * Serialize userRequest for storage
+   * Converts structured content to a summary string for database storage
+   */
+  private serializeUserRequest(userRequest: UserRequestContent): string {
+    if (typeof userRequest === 'string') {
+      return userRequest;
+    }
+
+    // For structured content, create a summary
+    const textBlocks = userRequest
+      .filter(b => b.type === 'text')
+      .map(b => (b as any).text)
+      .join(' ');
+
+    const imageCount = userRequest.filter(b => b.type === 'image').length;
+
+    return imageCount > 0
+      ? `${textBlocks} [${imageCount} image${imageCount > 1 ? 's' : ''}]`
+      : textBlocks;
   }
 
   /**
@@ -287,7 +309,7 @@ export class Orchestrator {
             accessToken: request.database.accessToken
           },
           {
-            userRequest: request.userRequest,
+            userRequest: this.serializeUserRequest(request.userRequest),
             provider: request.codingAssistantProvider,
             status: 'active',
             startTime
@@ -497,7 +519,7 @@ export class Orchestrator {
             accessToken: request.database.accessToken
           },
           {
-            userRequest: request.userRequest,
+            userRequest: this.serializeUserRequest(request.userRequest),
             provider: request.codingAssistantProvider,
             status: 'completed',
             endTime: Date.now()
@@ -574,7 +596,7 @@ export class Orchestrator {
             accessToken: request.database.accessToken
           },
           {
-            userRequest: request.userRequest,
+            userRequest: this.serializeUserRequest(request.userRequest),
             provider: request.codingAssistantProvider,
             status: 'error',
             endTime: Date.now()
@@ -627,8 +649,17 @@ export class Orchestrator {
    * Validate request payload
    */
   private validateRequest(request: ExecuteRequest): void {
-    if (!request.userRequest || request.userRequest.trim() === '') {
+    // Validate userRequest (can be string or structured content)
+    if (!request.userRequest) {
       throw new Error('userRequest is required');
+    }
+
+    if (typeof request.userRequest === 'string' && request.userRequest.trim() === '') {
+      throw new Error('userRequest cannot be empty');
+    }
+
+    if (Array.isArray(request.userRequest) && request.userRequest.length === 0) {
+      throw new Error('userRequest cannot be empty');
     }
 
     if (!request.codingAssistantProvider || request.codingAssistantProvider.trim() === '') {

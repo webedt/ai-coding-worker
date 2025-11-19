@@ -1,6 +1,8 @@
-import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type Options, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { BaseProvider, ProviderOptions, ProviderStreamEvent } from './BaseProvider';
 import { CredentialManager } from '../utils/credentialManager';
+import { UserRequestContent, ImageBlock, TextBlock } from '../types';
+import type { MessageParam } from '@anthropic-ai/sdk/resources';
 
 /**
  * Claude Code provider implementation
@@ -20,7 +22,7 @@ export class ClaudeCodeProvider extends BaseProvider {
    * Execute a user request using Claude Code
    */
   async execute(
-    userRequest: string,
+    userRequest: UserRequestContent,
     options: ProviderOptions,
     onEvent: (event: ProviderStreamEvent) => void
   ): Promise<void> {
@@ -30,12 +32,18 @@ export class ClaudeCodeProvider extends BaseProvider {
       model: queryOptions.model,
       cwd: queryOptions.cwd,
       permissionMode: queryOptions.permissionMode,
-      resumeSessionId: queryOptions.resume
+      resumeSessionId: queryOptions.resume,
+      hasStructuredContent: typeof userRequest !== 'string'
     });
 
     try {
+      // Prepare the prompt parameter based on request type
+      const prompt = typeof userRequest === 'string'
+        ? userRequest
+        : this.createStructuredMessageStream(userRequest);
+
       const queryStream = query({
-        prompt: userRequest,
+        prompt,
         options: queryOptions
       });
 
@@ -136,5 +144,47 @@ export class ClaudeCodeProvider extends BaseProvider {
     }
 
     return queryOptions;
+  }
+
+  /**
+   * Convert structured content (with images) into AsyncIterable<SDKUserMessage>
+   * This is required by the SDK when passing content with images
+   */
+  private async *createStructuredMessageStream(
+    content: Array<TextBlock | ImageBlock>
+  ): AsyncIterable<SDKUserMessage> {
+    // Convert our types to Anthropic SDK MessageParam format
+    const messageContent = content.map(block => {
+      if (block.type === 'text') {
+        return {
+          type: 'text' as const,
+          text: block.text
+        };
+      } else {
+        // Image block
+        return {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: block.source.media_type,
+            data: block.source.data
+          }
+        };
+      }
+    });
+
+    // Create the MessageParam
+    const messageParam: MessageParam = {
+      role: 'user',
+      content: messageContent
+    };
+
+    // Yield a single SDKUserMessage with the structured content
+    yield {
+      type: 'user',
+      message: messageParam,
+      parent_tool_use_id: null,
+      session_id: '' // Will be set by SDK
+    } as SDKUserMessage;
   }
 }
