@@ -125,6 +125,7 @@ export interface CommitProgressEvent extends SSEEvent {
 export interface APIError {
   error: string;
   message: string;
+  containerId?: string; // Optional container ID for debugging
   [key: string]: any;
 }
 
