@@ -8,7 +8,7 @@ import { SessionStorage } from './storage/sessionStorage';
 import { ProviderFactory } from './providers/ProviderFactory';
 import { Response } from 'express';
 import { logger } from './utils/logger';
-import { LLMHelper, generateBranchName } from './utils/llmHelper';
+import { LLMHelper } from './utils/llmHelper';
 import { GitHelper } from './utils/gitHelper';
 
 /**
@@ -163,52 +163,6 @@ export class Orchestrator {
         timestamp: new Date().toISOString()
       });
 
-      // Step 3.5: Generate session name (only for new sessions)
-      let sessionName: string | undefined;
-      let branchName: string | undefined;
-
-      if (!isResuming) {
-        // Extract API key for LLM helper
-        const apiKey = this.extractApiKey(request.codingAssistantAuthentication);
-
-        if (apiKey) {
-          try {
-            const llmHelper = new LLMHelper(apiKey);
-            sessionName = await llmHelper.generateSessionName(request.userRequest);
-
-            // Generate branch name if this is a GitHub session
-            if (request.github) {
-              branchName = generateBranchName(sessionName, sessionId.split('-')[0]);
-            }
-
-            // Update metadata with session name
-            metadata!.sessionName = sessionName;
-            // Note: GitHub branchName will be added to metadata after repo is cloned
-
-            // Send session name event
-            sendEvent({
-              type: 'session_name',
-              sessionName,
-              branchName,
-              timestamp: new Date().toISOString()
-            });
-
-            logger.info('Generated session metadata', {
-              component: 'Orchestrator',
-              sessionId,
-              sessionName,
-              branchName
-            });
-          } catch (error) {
-            logger.error('Failed to generate session name', error, {
-              component: 'Orchestrator',
-              sessionId
-            });
-            // Continue without session name - not critical
-          }
-        }
-      }
-
       // Step 4: Pull GitHub repository (only for new sessions with GitHub config)
       if (request.github && !isResuming) {
         sendEvent({
@@ -232,7 +186,6 @@ export class Orchestrator {
         metadata.github = {
           repoUrl: request.github.repoUrl,
           branch: pullResult.branch,
-          branchName: branchName, // Add generated branch name
           clonedPath: repoName
         };
 
@@ -258,44 +211,6 @@ export class Orchestrator {
           repoUrl: request.github.repoUrl,
           branch: pullResult.branch
         });
-
-        // Create branch if branchName was generated
-        if (branchName) {
-          try {
-            const gitHelper = new GitHelper(pullResult.targetPath);
-            const branchExists = await gitHelper.branchExists(branchName);
-
-            if (!branchExists) {
-              await gitHelper.createBranch(branchName);
-
-              sendEvent({
-                type: 'branch_created',
-                branchName,
-                message: `Created and checked out branch: ${branchName}`,
-                timestamp: new Date().toISOString()
-              });
-
-              logger.info('Created branch', {
-                component: 'Orchestrator',
-                sessionId,
-                branchName
-              });
-            } else {
-              logger.info('Branch already exists', {
-                component: 'Orchestrator',
-                sessionId,
-                branchName
-              });
-            }
-          } catch (error) {
-            logger.error('Failed to create branch', error, {
-              component: 'Orchestrator',
-              sessionId,
-              branchName
-            });
-            // Continue without branch creation - not critical
-          }
-        }
       } else if (metadata.github && isResuming) {
         // Resuming session with GitHub - workspace path should be repo directory
         workspacePath = path.join(this.tmpDir, `session-${sessionId}`, metadata.github.clonedPath);
