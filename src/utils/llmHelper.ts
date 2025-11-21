@@ -1,9 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './logger';
-import { UserRequestContent } from '../types';
 
 /**
- * Helper for making one-off LLM requests for metadata generation
+ * Helper for making one-off LLM requests for commit message generation
  * Uses Haiku for fast, cost-effective responses
  * Supports both API keys and OAuth tokens
  */
@@ -18,84 +17,6 @@ export class LLMHelper {
     } else {
       // API key - use apiKey parameter
       this.client = new Anthropic({ apiKey: authToken });
-    }
-  }
-
-  /**
-   * Extract text from UserRequestContent
-   * If it's a string, return as-is
-   * If it's structured content, concatenate all text blocks
-   */
-  private extractTextFromRequest(userRequest: UserRequestContent): string {
-    if (typeof userRequest === 'string') {
-      return userRequest;
-    }
-
-    // Extract text from all text blocks
-    return userRequest
-      .filter(block => block.type === 'text')
-      .map(block => (block as any).text)
-      .join(' ')
-      .trim();
-  }
-
-  /**
-   * Generate a concise session name from user request
-   * Example: "Create a hello.txt file" -> "Create hello.txt file"
-   * Supports both string and structured content (with images)
-   */
-  async generateSessionName(userRequest: UserRequestContent): Promise<string> {
-    try {
-      // Extract text from request (handles both string and structured content)
-      const requestText = this.extractTextFromRequest(userRequest);
-
-      // If no text found, use a default
-      if (!requestText) {
-        return 'New Session';
-      }
-
-      const response = await this.client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
-        messages: [
-          {
-            role: 'user',
-            content: `Generate a concise session name (max 60 characters) from this user request. The name should be descriptive but brief, suitable for a session title. Only return the session name, nothing else.
-
-User request: ${requestText}
-
-Session name:`
-          }
-        ]
-      });
-
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from LLM');
-      }
-
-      const sessionName = content.text.trim();
-
-      // Truncate if needed and clean up
-      const cleanName = sessionName
-        .replace(/^["']|["']$/g, '') // Remove quotes
-        .substring(0, 60)
-        .trim();
-
-      logger.info('Generated session name', {
-        component: 'LLMHelper',
-        userRequest: requestText.substring(0, 100),
-        sessionName: cleanName
-      });
-
-      return cleanName;
-    } catch (error) {
-      logger.error('Failed to generate session name', error, {
-        component: 'LLMHelper'
-      });
-      // Fallback: truncate user request text
-      const requestText = this.extractTextFromRequest(userRequest);
-      return requestText ? requestText.substring(0, 60).trim() : 'New Session';
     }
   }
 
@@ -148,30 +69,4 @@ Commit message:`
       return 'chore: auto-commit changes';
     }
   }
-}
-
-/**
- * Generate a GitHub-compatible branch name from session name
- * Format: webedt/{session-name}-{generatedId}
- * Max length: 100 characters (safe limit for GitHub)
- */
-export function generateBranchName(sessionName: string, generatedId: string): string {
-  // Clean session name: lowercase, replace spaces/special chars with hyphens
-  const cleanSessionName = sessionName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
-    .substring(0, 50); // Leave room for prefix and ID
-
-  // Format: webedt/{name}-{id}
-  const branchName = `webedt/${cleanSessionName}-${generatedId}`;
-
-  // Ensure it's within safe limits
-  if (branchName.length > 100) {
-    const maxSessionNameLength = 100 - `webedt/--${generatedId}`.length;
-    const truncatedName = cleanSessionName.substring(0, maxSessionNameLength);
-    return `webedt/${truncatedName}-${generatedId}`;
-  }
-
-  return branchName;
 }

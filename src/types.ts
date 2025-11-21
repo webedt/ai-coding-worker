@@ -113,18 +113,6 @@ export interface ErrorEvent extends SSEEvent {
   code?: string;
 }
 
-export interface SessionNameEvent extends SSEEvent {
-  type: 'session_name';
-  sessionName: string;
-  branchName?: string;
-}
-
-export interface BranchCreatedEvent extends SSEEvent {
-  type: 'branch_created';
-  branchName: string;
-  message: string;
-}
-
 export interface CommitProgressEvent extends SSEEvent {
   type: 'commit_progress';
   stage: 'analyzing' | 'generating_message' | 'committing' | 'completed';
@@ -153,7 +141,6 @@ export interface ExecutionContext {
 // Session metadata stored in volume
 export interface SessionMetadata {
   sessionId: string;
-  sessionName?: string; // Human-readable session name
   providerSessionId?: string; // Internal provider session ID (e.g., Claude Code's session_id)
   provider: string;
   createdAt: string;
@@ -161,7 +148,6 @@ export interface SessionMetadata {
   github?: {
     repoUrl: string;
     branch: string;
-    branchName?: string; // Generated branch name (webedt/...)
     clonedPath: string;
   };
 }
