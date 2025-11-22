@@ -289,7 +289,7 @@ export class SessionStorage {
       const sessions = new Set<string>();
 
       return new Promise((resolve, reject) => {
-        stream.on('data', (obj) => {
+        stream.on('data', (obj: { name?: string }) => {
           // Extract session ID from path: {sessionId}/workspace.tar.gz
           if (obj.name) {
             const sessionId = obj.name.split('/')[0];

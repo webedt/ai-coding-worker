@@ -20,7 +20,7 @@ export class StorageClient {
     const storageUrl = process.env.STORAGE_WORKER_URL;
     this.enabled = !!storageUrl;
 
-    if (!this.enabled) {
+    if (!this.enabled || !storageUrl) {
       logger.info('Storage worker not configured, session storage disabled', {
         component: 'StorageClient'
       });
