@@ -293,6 +293,9 @@ export class Orchestrator {
           const repoPath = path.join(this.tmpDir, `session-${sessionId}`, metadata.github.clonedPath);
           const gitHelper = new GitHelper(repoPath);
 
+          // Get current branch name
+          const currentBranch = await gitHelper.getCurrentBranch();
+
           // Check if there are changes to commit
           const hasChanges = await gitHelper.hasChanges();
 
@@ -301,6 +304,7 @@ export class Orchestrator {
               type: 'commit_progress',
               stage: 'analyzing',
               message: 'Analyzing changes for auto-commit...',
+              branch: currentBranch,
               timestamp: new Date().toISOString()
             });
 
@@ -312,6 +316,7 @@ export class Orchestrator {
               type: 'commit_progress',
               stage: 'generating_message',
               message: 'Generating commit message...',
+              branch: currentBranch,
               timestamp: new Date().toISOString()
             });
 
@@ -324,7 +329,8 @@ export class Orchestrator {
               sendEvent({
                 type: 'commit_progress',
                 stage: 'committing',
-                message: 'Creating commit...',
+                message: `Attempting to commit changes to branch: ${currentBranch}`,
+                branch: currentBranch,
                 commitMessage,
                 timestamp: new Date().toISOString()
               });
@@ -334,8 +340,9 @@ export class Orchestrator {
 
               sendEvent({
                 type: 'commit_progress',
-                stage: 'completed',
+                stage: 'committed',
                 message: 'Changes committed successfully',
+                branch: currentBranch,
                 commitMessage,
                 commitHash,
                 timestamp: new Date().toISOString()
@@ -345,14 +352,17 @@ export class Orchestrator {
                 component: 'Orchestrator',
                 sessionId,
                 commitHash,
-                commitMessage
+                commitMessage,
+                branch: currentBranch
               });
 
               // Push to remote
               sendEvent({
                 type: 'commit_progress',
                 stage: 'pushing',
-                message: 'Pushing changes to remote...',
+                message: `Attempting to push branch ${currentBranch} to remote...`,
+                branch: currentBranch,
+                commitHash,
                 timestamp: new Date().toISOString()
               });
 
@@ -362,7 +372,8 @@ export class Orchestrator {
                 sendEvent({
                   type: 'commit_progress',
                   stage: 'pushed',
-                  message: 'Changes pushed to remote successfully',
+                  message: `Successfully pushed branch ${currentBranch} to remote`,
+                  branch: currentBranch,
                   commitHash,
                   timestamp: new Date().toISOString()
                 });
@@ -370,28 +381,41 @@ export class Orchestrator {
                 logger.info('Push completed', {
                   component: 'Orchestrator',
                   sessionId,
-                  commitHash
+                  commitHash,
+                  branch: currentBranch
                 });
               } catch (pushError) {
                 // Push failure is non-critical - commit is still saved locally
                 logger.error('Failed to push to remote (non-critical)', pushError, {
                   component: 'Orchestrator',
-                  sessionId
+                  sessionId,
+                  branch: currentBranch
                 });
 
                 sendEvent({
                   type: 'commit_progress',
                   stage: 'push_failed',
-                  message: 'Failed to push to remote (commit saved locally)',
+                  message: `Failed to push branch ${currentBranch} to remote (commit saved locally)`,
+                  branch: currentBranch,
                   error: pushError instanceof Error ? pushError.message : String(pushError),
                   timestamp: new Date().toISOString()
                 });
               }
+
+              // Send final completion event
+              sendEvent({
+                type: 'commit_progress',
+                stage: 'completed',
+                message: 'Auto-commit process completed',
+                branch: currentBranch,
+                timestamp: new Date().toISOString()
+              });
             }
           } else {
             logger.info('No changes to auto-commit', {
               component: 'Orchestrator',
-              sessionId
+              sessionId,
+              branch: currentBranch
             });
           }
         } catch (error) {
@@ -404,6 +428,7 @@ export class Orchestrator {
             type: 'commit_progress',
             stage: 'completed',
             message: 'Auto-commit failed (non-critical)',
+            error: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString()
           });
         }
