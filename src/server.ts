@@ -166,8 +166,6 @@ app.post('/execute', async (req: Request, res: Response) => {
   workerStatus = 'busy';
   console.log(`[Container ${containerId}] Status changed to: busy`);
 
-  res.setHeader('X-Container-ID', containerId);
-
   // Parse request
   const request: ExecuteRequest = req.body;
 
@@ -257,6 +255,7 @@ app.post('/execute', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('X-Container-ID', containerId);
 
   try {
     // Execute the orchestrated workflow
