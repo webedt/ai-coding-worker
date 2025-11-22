@@ -57,24 +57,21 @@ services:
     networks:
       - worker-network
     deploy:
-      replicas: 5
+      replicas: 10
       restart_policy:
         condition: any
         delay: 0s
         max_attempts: 0
       resources:
         limits:
-          cpus: '2.0'
-          memory: 4G
-        reservations:
           cpus: '0.5'
-          memory: 1G
+          memory: 512M
       update_config:
-        parallelism: 2
+        parallelism: 1
         delay: 10s
         failure_action: rollback
       rollback_config:
-        parallelism: 2
+        parallelism: 1
         delay: 10s
 
 networks:
