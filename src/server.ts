@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 5000;
 const TMP_DIR = process.env.TMP_DIR || '/tmp';
 const DB_BASE_URL = process.env.DB_BASE_URL;
 
+// Container identification (Docker sets HOSTNAME to container ID)
+const containerId = process.env.HOSTNAME || 'unknown';
+
 // Default coding assistant credentials from environment (optional fallback)
 const DEFAULT_CODING_ASSISTANT_PROVIDER = process.env.CODING_ASSISTANT_PROVIDER;
 const DEFAULT_CODING_ASSISTANT_AUTHENTICATION = process.env.CODING_ASSISTANT_AUTHENTICATION;
@@ -59,10 +62,12 @@ orchestrator.initialize().catch(err => {
  * Health check endpoint
  */
 app.get('/health', (req: Request, res: Response) => {
+  res.setHeader('X-Container-ID', containerId);
   res.json({
     status: 'ok',
     tmpDir: TMP_DIR,
     workerStatus,
+    containerId,
     timestamp: new Date().toISOString(),
   });
 });
@@ -71,8 +76,10 @@ app.get('/health', (req: Request, res: Response) => {
  * Status endpoint - returns whether worker is idle or busy
  */
 app.get('/status', (req: Request, res: Response) => {
+  res.setHeader('X-Container-ID', containerId);
   res.json({
     status: workerStatus,
+    containerId,
     timestamp: new Date().toISOString(),
   });
 });
@@ -82,18 +89,21 @@ app.get('/status', (req: Request, res: Response) => {
  * Returns array of session IDs from MinIO
  */
 app.get('/sessions', async (req: Request, res: Response) => {
+  res.setHeader('X-Container-ID', containerId);
   try {
     const sessionIds = await orchestrator.listSessions();
 
     res.json({
       count: sessionIds.length,
-      sessions: sessionIds.map(id => ({ sessionId: id, storage: 'minio' }))
+      sessions: sessionIds.map(id => ({ sessionId: id, storage: 'minio' })),
+      containerId
     });
   } catch (error) {
-    console.error('[Sessions] Error listing sessions:', error);
+    console.error(`[Container ${containerId}] Error listing sessions:`, error);
     res.status(500).json({
       error: 'internal_error',
-      message: 'Failed to list sessions'
+      message: 'Failed to list sessions',
+      containerId
     });
   }
 });
@@ -104,19 +114,22 @@ app.get('/sessions', async (req: Request, res: Response) => {
  */
 app.delete('/sessions/:sessionId', async (req: Request, res: Response) => {
   const { sessionId } = req.params;
+  res.setHeader('X-Container-ID', containerId);
 
   try {
     await orchestrator.deleteSession(sessionId);
 
     res.json({
       sessionId,
-      deleted: true
+      deleted: true,
+      containerId
     });
   } catch (error) {
-    console.error(`[Sessions] Error deleting session ${sessionId}:`, error);
+    console.error(`[Container ${containerId}] Error deleting session ${sessionId}:`, error);
     res.status(500).json({
       error: 'internal_error',
-      message: 'Failed to delete session'
+      message: 'Failed to delete session',
+      containerId
     });
   }
 });
@@ -132,16 +145,24 @@ app.delete('/sessions/:sessionId', async (req: Request, res: Response) => {
  * 4. Full: GitHub + database persistence
  */
 app.post('/execute', async (req: Request, res: Response) => {
+  console.log(`[Container ${containerId}] Received execute request`);
+  console.log(`[Container ${containerId}] Current status: ${workerStatus}`);
+
   // Check if worker is busy
   if (workerStatus === 'busy') {
+    console.log(`[Container ${containerId}] Rejecting request - worker busy`);
+    res.setHeader('X-Container-ID', containerId);
     const error: APIError = {
       error: 'busy',
       message: 'Worker is currently processing another request',
-      retryAfter: 5
+      retryAfter: 5,
+      containerId
     };
     res.status(429).json(error);
     return;
   }
+
+  res.setHeader('X-Container-ID', containerId);
 
   // Parse request
   const request: ExecuteRequest = req.body;
@@ -198,17 +219,17 @@ app.post('/execute', async (req: Request, res: Response) => {
 
   // Set worker to busy
   workerStatus = 'busy';
-  console.log(`[Worker] Status: busy - Starting execution`);
-  console.log(`[Worker] Provider: ${request.codingAssistantProvider}`);
+  console.log(`[Container ${containerId}] Status: busy - Starting execution`);
+  console.log(`[Container ${containerId}] Provider: ${request.codingAssistantProvider}`);
 
   // Handle logging for both string and structured content
   const requestPreview = typeof request.userRequest === 'string'
     ? request.userRequest.substring(0, 100)
     : `[Structured content with ${request.userRequest.length} blocks]`;
-  console.log(`[Worker] Request: ${requestPreview}...`);
+  console.log(`[Container ${containerId}] Request: ${requestPreview}...`);
 
   // Log full request parameters for debugging (with redaction)
-  console.log('[Worker] Full request payload:');
+  console.log(`[Container ${containerId}] Full request payload:`);
   console.log('  - userRequest:', typeof request.userRequest === 'string'
     ? request.userRequest
     : `[Structured content with ${request.userRequest.length} blocks - ${request.userRequest.filter(b => b.type === 'image').length} images]`);
@@ -222,7 +243,7 @@ app.post('/execute', async (req: Request, res: Response) => {
 
   // Normalize codingAssistantAuthentication to string (handle both object and string formats)
   if (typeof request.codingAssistantAuthentication === 'object') {
-    console.log('[Worker] Converting codingAssistantAuthentication from object to string');
+    console.log(`[Container ${containerId}] Converting codingAssistantAuthentication from object to string`);
     request.codingAssistantAuthentication = JSON.stringify(request.codingAssistantAuthentication);
   }
 
@@ -236,16 +257,16 @@ app.post('/execute', async (req: Request, res: Response) => {
     // Execute the orchestrated workflow
     await orchestrator.execute(request, res);
 
-    console.log('[Worker] Execution completed successfully');
+    console.log(`[Container ${containerId}] Execution completed successfully`);
 
     // Exit process after successful completion (ephemeral container model)
-    console.log('[Worker] Exiting process in 1 second...');
+    console.log(`[Container ${containerId}] Exiting process in 1 second...`);
     setTimeout(() => process.exit(0), 1000);
   } catch (error) {
-    console.error('[Worker] Execution failed:', error);
+    console.error(`[Container ${containerId}] Execution failed:`, error);
 
     // Exit process after error (ephemeral container model)
-    console.log('[Worker] Exiting process in 1 second...');
+    console.log(`[Container ${containerId}] Exiting process in 1 second...`);
     setTimeout(() => process.exit(1), 1000);
   }
 });
@@ -254,6 +275,7 @@ app.post('/execute', async (req: Request, res: Response) => {
  * Catch-all for undefined routes
  */
 app.use((req: Request, res: Response) => {
+  res.setHeader('X-Container-ID', containerId);
   res.status(404).json({
     error: 'not_found',
     message: `Endpoint not found: ${req.method} ${req.path}`,
@@ -264,7 +286,8 @@ app.use((req: Request, res: Response) => {
       'GET  /sessions/:sessionId',
       'GET  /sessions/:sessionId/stream',
       'POST /execute'
-    ]
+    ],
+    containerId
   });
 });
 
@@ -275,6 +298,7 @@ app.listen(PORT, () => {
   console.log('='.repeat(60));
   console.log('🚀 Unified Coding Assistant Worker (MinIO Storage)');
   console.log('='.repeat(60));
+  console.log(`🆔 Container ID: ${containerId}`);
   console.log(`📡 Server running on port ${PORT}`);
   console.log(`📁 Temp directory: ${TMP_DIR}`);
   console.log(`🗄️  Storage: MinIO (${process.env.MINIO_ENDPOINT || 'Not configured'})`);
@@ -297,16 +321,17 @@ app.listen(PORT, () => {
   console.log('  - Returns 429 if busy (load balancer will retry)');
   console.log('  - Sessions stored in MinIO for complete isolation');
   console.log('  - Downloads session at start, uploads at end');
+  console.log('  - Container tracking via X-Container-ID header');
   console.log('='.repeat(60));
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('[Worker] SIGTERM received, shutting down gracefully...');
+  console.log(`[Container ${containerId}] SIGTERM received, shutting down gracefully...`);
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('[Worker] SIGINT received, shutting down gracefully...');
+  console.log(`[Container ${containerId}] SIGINT received, shutting down gracefully...`);
   process.exit(0);
 });
