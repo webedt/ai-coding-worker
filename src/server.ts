@@ -162,13 +162,18 @@ app.post('/execute', async (req: Request, res: Response) => {
     return;
   }
 
+  // Set worker to busy IMMEDIATELY to prevent race conditions
+  workerStatus = 'busy';
+  console.log(`[Container ${containerId}] Status changed to: busy`);
+
   res.setHeader('X-Container-ID', containerId);
 
   // Parse request
   const request: ExecuteRequest = req.body;
 
-  // Basic validation
+  // Basic validation (reset worker status if validation fails)
   if (!request.userRequest) {
+    workerStatus = 'idle';
     const error: APIError = {
       error: 'invalid_request',
       message: 'Missing required field: userRequest',
@@ -184,6 +189,7 @@ app.post('/execute', async (req: Request, res: Response) => {
       request.codingAssistantProvider = DEFAULT_CODING_ASSISTANT_PROVIDER;
       console.log('[Server] Using CODING_ASSISTANT_PROVIDER from environment');
     } else {
+      workerStatus = 'idle';
       const error: APIError = {
         error: 'invalid_request',
         message: 'Missing required field: codingAssistantProvider (not in request or environment)',
@@ -199,6 +205,7 @@ app.post('/execute', async (req: Request, res: Response) => {
       request.codingAssistantAuthentication = DEFAULT_CODING_ASSISTANT_AUTHENTICATION;
       console.log('[Server] Using CODING_ASSISTANT_AUTHENTICATION from environment');
     } else {
+      workerStatus = 'idle';
       const error: APIError = {
         error: 'invalid_request',
         message: 'Missing required field: codingAssistantAuthentication (not in request or environment)',
@@ -217,9 +224,7 @@ app.post('/execute', async (req: Request, res: Response) => {
     }
   }
 
-  // Set worker to busy
-  workerStatus = 'busy';
-  console.log(`[Container ${containerId}] Status: busy - Starting execution`);
+  console.log(`[Container ${containerId}] Starting execution`);
   console.log(`[Container ${containerId}] Provider: ${request.codingAssistantProvider}`);
 
   // Handle logging for both string and structured content
