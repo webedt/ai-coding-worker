@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ExecuteRequest, SSEEvent, SessionMetadata, UserRequestContent } from './types';
 import { GitHubClient } from './clients/githubClient';
 import { DBClient } from './clients/dbClient';
-import { SessionStorage } from './storage/sessionStorage';
+import { StorageClient } from './storage/storageClient';
 import { ProviderFactory } from './providers/ProviderFactory';
 import { Response } from 'express';
 import { logger } from './utils/logger';
@@ -13,19 +13,19 @@ import { GitHelper } from './utils/gitHelper';
 
 /**
  * Main orchestrator for executing coding assistant requests
- * Uses MinIO for session storage - downloads session at start, uploads at end
+ * Uses storage-worker for session storage - downloads session at start, uploads at end
  */
 export class Orchestrator {
   private githubClient: GitHubClient;
   private dbClient: DBClient;
-  private sessionStorage: SessionStorage;
+  private sessionStorage: StorageClient;
   private tmpDir: string;
 
   constructor(tmpDir: string, dbBaseUrl?: string) {
     this.tmpDir = tmpDir || '/tmp';
     this.githubClient = new GitHubClient();
     this.dbClient = new DBClient(dbBaseUrl);
-    this.sessionStorage = new SessionStorage();
+    this.sessionStorage = new StorageClient();
   }
 
   /**
