@@ -115,7 +115,7 @@ export interface ErrorEvent extends SSEEvent {
 
 export interface CommitProgressEvent extends SSEEvent {
   type: 'commit_progress';
-  stage: 'analyzing' | 'generating_message' | 'committing' | 'committed' | 'pushing' | 'pushed' | 'push_failed' | 'completed';
+  stage: 'analyzing' | 'creating_branch' | 'generating_message' | 'committing' | 'committed' | 'pushing' | 'pushed' | 'push_failed' | 'completed';
   message: string;
   branch?: string;
   commitMessage?: string;
