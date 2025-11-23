@@ -1,5 +1,9 @@
 # AI Coding Worker
 
+> **⚠️ REPOSITORY MOVED**
+> This repository has been moved to [https://github.com/webedt/monorepo](https://github.com/webedt/monorepo).
+> Please use the monorepo for the latest updates and development.
+
 Scalable AI coding assistant API with Docker Swarm orchestration, multi-provider support, and GitHub integration.
 
 ## Features
