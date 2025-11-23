@@ -293,8 +293,8 @@ export class Orchestrator {
           const repoPath = path.join(this.tmpDir, `session-${sessionId}`, metadata.github.clonedPath);
           const gitHelper = new GitHelper(repoPath);
 
-          // Get current branch name
-          const currentBranch = await gitHelper.getCurrentBranch();
+          // Get current branch name (this is the parent branch)
+          const parentBranch = await gitHelper.getCurrentBranch();
 
           // Check if there are changes to commit
           const hasChanges = await gitHelper.hasChanges();
@@ -304,45 +304,77 @@ export class Orchestrator {
               type: 'commit_progress',
               stage: 'analyzing',
               message: 'Analyzing changes for auto-commit...',
-              branch: currentBranch,
+              branch: parentBranch,
               timestamp: new Date().toISOString()
             });
 
-            // Get git status and diff
-            const gitStatus = await gitHelper.getStatus();
-            const gitDiff = await gitHelper.getDiff();
-
-            sendEvent({
-              type: 'commit_progress',
-              stage: 'generating_message',
-              message: 'Generating commit message...',
-              branch: currentBranch,
-              timestamp: new Date().toISOString()
-            });
-
-            // Generate commit message
+            // Prepare for new branch creation
             const apiKey = this.extractApiKey(request.codingAssistantAuthentication);
+
+            // Default to parent branch if we can't create a new one (shouldn't happen with valid apiKey)
+            let targetBranch = parentBranch;
+
             if (apiKey) {
               const llmHelper = new LLMHelper(apiKey);
+
+              // 1. Generate unique branch name
+              // Extract text from request for prompt
+              const requestText = typeof request.userRequest === 'string'
+                  ? request.userRequest
+                  : request.userRequest
+                      .filter(b => b.type === 'text')
+                      .map(b => (b as any).text)
+                      .join(' ');
+
+              const baseBranchName = await llmHelper.generateBranchName(requestText);
+
+              // Append random suffix to ensure uniqueness (8 chars of UUID)
+              const uniqueSuffix = uuidv4().substring(0, 8);
+              targetBranch = `${baseBranchName}-${uniqueSuffix}`;
+
+              sendEvent({
+                type: 'commit_progress',
+                stage: 'creating_branch',
+                message: `Creating and switching to new branch: ${targetBranch}`,
+                branch: targetBranch,
+                timestamp: new Date().toISOString()
+              });
+
+              // Create and switch to new branch
+              await gitHelper.createBranch(targetBranch);
+
+              // 2. Get git status and diff (on new branch)
+              const gitStatus = await gitHelper.getStatus();
+              const gitDiff = await gitHelper.getDiff();
+
+              sendEvent({
+                type: 'commit_progress',
+                stage: 'generating_message',
+                message: 'Generating commit message...',
+                branch: targetBranch,
+                timestamp: new Date().toISOString()
+              });
+
+              // 3. Generate commit message
               const commitMessage = await llmHelper.generateCommitMessage(gitStatus, gitDiff);
 
               sendEvent({
                 type: 'commit_progress',
                 stage: 'committing',
-                message: `Attempting to commit changes to branch: ${currentBranch}`,
-                branch: currentBranch,
+                message: `Attempting to commit changes to branch: ${targetBranch}`,
+                branch: targetBranch,
                 commitMessage,
                 timestamp: new Date().toISOString()
               });
 
-              // Create commit
+              // 4. Create commit
               const commitHash = await gitHelper.commitAll(commitMessage);
 
               sendEvent({
                 type: 'commit_progress',
                 stage: 'committed',
                 message: 'Changes committed successfully',
-                branch: currentBranch,
+                branch: targetBranch,
                 commitMessage,
                 commitHash,
                 timestamp: new Date().toISOString()
@@ -353,15 +385,16 @@ export class Orchestrator {
                 sessionId,
                 commitHash,
                 commitMessage,
-                branch: currentBranch
+                branch: targetBranch,
+                parentBranch
               });
 
-              // Push to remote
+              // 5. Push to remote
               sendEvent({
                 type: 'commit_progress',
                 stage: 'pushing',
-                message: `Attempting to push branch ${currentBranch} to remote...`,
-                branch: currentBranch,
+                message: `Attempting to push branch ${targetBranch} to remote...`,
+                branch: targetBranch,
                 commitHash,
                 timestamp: new Date().toISOString()
               });
@@ -372,8 +405,8 @@ export class Orchestrator {
                 sendEvent({
                   type: 'commit_progress',
                   stage: 'pushed',
-                  message: `Successfully pushed branch ${currentBranch} to remote`,
-                  branch: currentBranch,
+                  message: `Successfully pushed branch ${targetBranch} to remote`,
+                  branch: targetBranch,
                   commitHash,
                   timestamp: new Date().toISOString()
                 });
@@ -382,21 +415,21 @@ export class Orchestrator {
                   component: 'Orchestrator',
                   sessionId,
                   commitHash,
-                  branch: currentBranch
+                  branch: targetBranch
                 });
               } catch (pushError) {
                 // Push failure is non-critical - commit is still saved locally
                 logger.error('Failed to push to remote (non-critical)', pushError, {
                   component: 'Orchestrator',
                   sessionId,
-                  branch: currentBranch
+                  branch: targetBranch
                 });
 
                 sendEvent({
                   type: 'commit_progress',
                   stage: 'push_failed',
-                  message: `Failed to push branch ${currentBranch} to remote (commit saved locally)`,
-                  branch: currentBranch,
+                  message: `Failed to push branch ${targetBranch} to remote (commit saved locally)`,
+                  branch: targetBranch,
                   error: pushError instanceof Error ? pushError.message : String(pushError),
                   timestamp: new Date().toISOString()
                 });
@@ -407,7 +440,7 @@ export class Orchestrator {
                 type: 'commit_progress',
                 stage: 'completed',
                 message: 'Auto-commit process completed',
-                branch: currentBranch,
+                branch: targetBranch,
                 timestamp: new Date().toISOString()
               });
             }
@@ -415,7 +448,7 @@ export class Orchestrator {
             logger.info('No changes to auto-commit', {
               component: 'Orchestrator',
               sessionId,
-              branch: currentBranch
+              branch: parentBranch
             });
           }
         } catch (error) {
