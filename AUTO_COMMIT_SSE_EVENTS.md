@@ -12,12 +12,23 @@ When auto-commit is enabled (default for GitHub repositories), the following SSE
   "type": "commit_progress",
   "stage": "analyzing",
   "message": "Analyzing changes for auto-commit...",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "branch": "main",
   "timestamp": "2025-11-22T10:30:00.000Z"
 }
 ```
 
-### 2. **Generating Commit Message**
+### 2. **Creating Branch**
+```json
+{
+  "type": "commit_progress",
+  "stage": "creating_branch",
+  "message": "Creating and switching to new branch: feature/auto-commit-sse-progress-abc12345",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
+  "timestamp": "2025-11-22T10:30:00.500Z"
+}
+```
+
+### 3. **Generating Commit Message**
 ```json
 {
   "type": "commit_progress",
@@ -28,19 +39,19 @@ When auto-commit is enabled (default for GitHub repositories), the following SSE
 }
 ```
 
-### 3. **Attempting Commit**
+### 4. **Attempting Commit**
 ```json
 {
   "type": "commit_progress",
   "stage": "committing",
-  "message": "Attempting to commit changes to branch: claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "message": "Attempting to commit changes to branch: feature/auto-commit-sse-progress-abc12345",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
   "commitMessage": "feat: Add SSE progress events for auto-commit process",
   "timestamp": "2025-11-22T10:30:03.000Z"
 }
 ```
 
-### 4. **Commit Success**
+### 5. **Commit Success**
 ```json
 {
   "type": "commit_progress",
@@ -53,49 +64,49 @@ When auto-commit is enabled (default for GitHub repositories), the following SSE
 }
 ```
 
-### 5. **Attempting Push**
+### 6. **Attempting Push**
 ```json
 {
   "type": "commit_progress",
   "stage": "pushing",
-  "message": "Attempting to push branch claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET to remote...",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "message": "Attempting to push branch feature/auto-commit-sse-progress-abc12345 to remote...",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
   "commitHash": "abc123def456",
   "timestamp": "2025-11-22T10:30:05.000Z"
 }
 ```
 
-### 6a. **Push Success** (if push succeeds)
+### 7a. **Push Success** (if push succeeds)
 ```json
 {
   "type": "commit_progress",
   "stage": "pushed",
-  "message": "Successfully pushed branch claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET to remote",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "message": "Successfully pushed branch feature/auto-commit-sse-progress-abc12345 to remote",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
   "commitHash": "abc123def456",
   "timestamp": "2025-11-22T10:30:07.000Z"
 }
 ```
 
-### 6b. **Push Failed** (if push fails)
+### 7b. **Push Failed** (if push fails)
 ```json
 {
   "type": "commit_progress",
   "stage": "push_failed",
-  "message": "Failed to push branch claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET to remote (commit saved locally)",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "message": "Failed to push branch feature/auto-commit-sse-progress-abc12345 to remote (commit saved locally)",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
   "error": "Error: Authentication failed",
   "timestamp": "2025-11-22T10:30:07.000Z"
 }
 ```
 
-### 7. **Completion**
+### 8. **Completion**
 ```json
 {
   "type": "commit_progress",
   "stage": "completed",
   "message": "Auto-commit process completed",
-  "branch": "claude/auto-commit-sse-progress-01BEUZZtczXe7YZVpNCPvxET",
+  "branch": "feature/auto-commit-sse-progress-abc12345",
   "timestamp": "2025-11-22T10:30:08.000Z"
 }
 ```
@@ -131,13 +142,14 @@ Optional fields based on stage:
 ## Stages
 
 1. `analyzing` - Checking for changes
-2. `generating_message` - Using LLM to create commit message
-3. `committing` - Attempting to create commit
-4. `committed` - Commit created successfully
-5. `pushing` - Attempting to push to remote
-6. `pushed` - Successfully pushed to remote
-7. `push_failed` - Failed to push (non-critical, commit still saved)
-8. `completed` - Process finished (success or failure)
+2. `creating_branch` - Creating and switching to new unique branch
+3. `generating_message` - Using LLM to create commit message
+4. `committing` - Attempting to create commit
+5. `committed` - Commit created successfully
+6. `pushing` - Attempting to push to remote
+7. `pushed` - Successfully pushed to remote
+8. `push_failed` - Failed to push (non-critical, commit still saved)
+9. `completed` - Process finished (success or failure)
 
 ## Implementation Location
 

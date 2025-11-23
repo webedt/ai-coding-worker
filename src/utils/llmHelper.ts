@@ -69,4 +69,55 @@ Commit message:`
       return 'chore: auto-commit changes';
     }
   }
+
+  /**
+   * Generate a branch name from user request
+   */
+  async generateBranchName(userRequest: string): Promise<string> {
+    try {
+      const response = await this.client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a concise, valid git branch name based on the following user request.
+Rules:
+- Lowercase only
+- Use hyphens as separators
+- Max 50 characters
+- No special characters
+- Only return the branch name, nothing else
+
+User request:
+${userRequest.substring(0, 1000)}
+
+Branch name:`
+          }
+        ]
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected response type from LLM');
+      }
+
+      let branchName = content.text.trim();
+      // Ensure it's a valid branch name
+      branchName = branchName.replace(/[^a-z0-9-\/]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+      logger.info('Generated branch name', {
+        component: 'LLMHelper',
+        branchName
+      });
+
+      return branchName;
+    } catch (error) {
+      logger.error('Failed to generate branch name', error, {
+        component: 'LLMHelper'
+      });
+      // Fallback
+      return `feature/auto-request`;
+    }
+  }
 }
