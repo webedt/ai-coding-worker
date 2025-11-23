@@ -5,7 +5,7 @@ This document describes the API endpoints for the Unified Worker backend service
 ## Base URL
 
 ```
-http://localhost:5001  # Local development
+http://localhost:5000  # Local development (default port)
 https://your-domain.com  # Production
 ```
 
@@ -27,6 +27,9 @@ Check if the service is running.
 ```json
 {
   "status": "ok",
+  "tmpDir": "/tmp",
+  "workerStatus": "idle",
+  "containerId": "abc123def456",
   "timestamp": "2025-11-15T22:33:40.244Z"
 }
 ```
@@ -43,6 +46,7 @@ Check if a worker is available to accept jobs.
 ```json
 {
   "status": "idle",
+  "containerId": "abc123def456",
   "timestamp": "2025-11-15T22:33:40.244Z"
 }
 ```
@@ -52,6 +56,7 @@ or
 ```json
 {
   "status": "busy",
+  "containerId": "abc123def456",
   "timestamp": "2025-11-15T22:33:40.244Z"
 }
 ```
@@ -77,11 +82,21 @@ Content-Type: application/json
 
 ```typescript
 interface ExecuteRequest {
-  // Required: The user's coding request
-  userRequest: string;
+  // Required: The user's coding request (string or structured content with images)
+  userRequest: string | Array<{
+    type: 'text';
+    text: string;
+  } | {
+    type: 'image';
+    source: {
+      type: 'base64';
+      media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+      data: string; // base64-encoded image data
+    };
+  }>;
 
   // Required: Provider to use
-  codingAssistantProvider: "ClaudeAgentSDK" | "Codex";
+  codingAssistantProvider: "claude-code" | "codex" | "cursor";
 
   // Required: Authentication credentials (provider-specific format)
   codingAssistantAuthentication: string | object;
@@ -91,13 +106,12 @@ interface ExecuteRequest {
 
   // Optional: GitHub integration
   github?: {
-    repoUrl: string;      // e.g., "https://github.com/user/repo.git"
-    branch?: string;      // Default: "main"
-    accessToken: string;  // GitHub personal access token
+    repoUrl: string;           // e.g., "https://github.com/user/repo.git"
+    branch?: string;           // Default: "main"
+    directory?: string;        // Optional subdirectory to work in
+    accessToken?: string;      // GitHub personal access token
+    refreshToken?: string;     // GitHub refresh token (if applicable)
   };
-
-  // Optional: Auto-commit changes after execution
-  autoCommit?: boolean;
 
   // Optional: Provider-specific options
   providerOptions?: {
@@ -111,6 +125,12 @@ interface ExecuteRequest {
     sessionId: string;
     accessToken: string;
   };
+
+  // Optional: Workspace configuration
+  workspace?: {
+    path?: string;            // Custom workspace path
+    environment?: string;     // Environment name
+  };
 }
 ```
 
@@ -119,7 +139,7 @@ interface ExecuteRequest {
 ```json
 {
   "userRequest": "Create a hello.txt file with a greeting",
-  "codingAssistantProvider": "ClaudeAgentSDK",
+  "codingAssistantProvider": "claude-code",
   "codingAssistantAuthentication": {
     "claudeAiOauth": {
       "accessToken": "sk-ant-oat01-...",
@@ -138,7 +158,7 @@ interface ExecuteRequest {
 ```json
 {
   "userRequest": "Add a new feature to handle user authentication",
-  "codingAssistantProvider": "ClaudeAgentSDK",
+  "codingAssistantProvider": "claude-code",
   "codingAssistantAuthentication": {
     "claudeAiOauth": { "..." }
   },
@@ -146,17 +166,18 @@ interface ExecuteRequest {
     "repoUrl": "https://github.com/myorg/myrepo.git",
     "branch": "main",
     "accessToken": "gho_..."
-  },
-  "autoCommit": true
+  }
 }
 ```
+
+**Note:** Auto-commit is handled automatically based on GitHub metadata requirements. See the auto-commit documentation for details.
 
 **Example Request (Resume Session):**
 
 ```json
 {
   "userRequest": "Now add unit tests for the authentication feature",
-  "codingAssistantProvider": "ClaudeAgentSDK",
+  "codingAssistantProvider": "claude-code",
   "codingAssistantAuthentication": {
     "claudeAiOauth": { "..." }
   },
@@ -180,14 +201,9 @@ data: <JSON object>\n\n
 {
   type: "connected";
   sessionId: string;
-  timestamp: string;
-}
-
-// Session metadata
-{
-  type: "session_name";
-  sessionName: string;
-  branchName?: string;
+  resuming: boolean;
+  resumedFrom?: string;
+  provider: string;
   timestamp: string;
 }
 
@@ -201,34 +217,30 @@ data: <JSON object>\n\n
 // GitHub clone/pull progress
 {
   type: "github_pull_progress";
-  stage: "cloning" | "pulling" | "complete";
-  message: string;
-  targetPath?: string;
+  data: {
+    type: "message" | "completed";
+    message?: string;
+    targetPath?: string;
+  };
   timestamp: string;
 }
 
-// Branch created
-{
-  type: "branch_created";
-  branchName: string;
-  message: string;
-  timestamp: string;
-}
-
-// Auto-commit progress
+// Commit progress (when GitHub metadata is present)
 {
   type: "commit_progress";
-  stage: "analyzing" | "generating" | "committing" | "committed" | "pushing" | "pushed" | "push_failed";
+  stage: "analyzing" | "creating_branch" | "generating_message" | "committing" | "committed" | "pushing" | "pushed" | "push_failed" | "completed";
   message: string;
+  branch?: string;
+  commitMessage?: string;
   commitHash?: string;
   error?: string;
   timestamp: string;
 }
 
-// Provider output (forwarded as-is from Claude/Codex)
+// Provider output (forwarded as-is from Claude Code/Codex)
 {
   type: "assistant_message";
-  // ... provider-specific fields
+  // ... provider-specific fields (varies by provider)
 }
 
 // Job completed
@@ -243,7 +255,7 @@ data: <JSON object>\n\n
 {
   type: "error";
   error: string;
-  code: "VALIDATION_ERROR" | "GITHUB_ERROR" | "PROVIDER_ERROR" | "EXECUTION_ERROR" | "UNKNOWN_ERROR";
+  code?: "VALIDATION_ERROR" | "GITHUB_ERROR" | "PROVIDER_ERROR" | "EXECUTION_ERROR" | "UNKNOWN_ERROR";
   timestamp: string;
 }
 ```
@@ -257,14 +269,14 @@ data: <JSON object>\n\n
 **JavaScript Example (Fetch API):**
 
 ```javascript
-const response = await fetch('http://localhost:5001/execute', {
+const response = await fetch('http://localhost:5000/execute', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
     userRequest: 'Create a hello.txt file',
-    codingAssistantProvider: 'ClaudeAgentSDK',
+    codingAssistantProvider: 'claude-code',
     codingAssistantAuthentication: {
       claudeAiOauth: {
         accessToken: 'sk-ant-oat01-...',
@@ -319,80 +331,37 @@ Get a list of all sessions stored in MinIO.
 **Response:**
 ```json
 {
+  "count": 1,
   "sessions": [
     {
       "sessionId": "9de73868-722a-4f1e-9c17-080ae9683442",
-      "lastModified": "2025-11-15T22:33:40.244Z"
+      "storage": "minio"
     }
-  ]
+  ],
+  "containerId": "abc123def456"
 }
 ```
 
 ---
 
-### 5. Get Session Details
+### 5. Delete Session
 
-**GET** `/sessions/:sessionId`
+**DELETE** `/sessions/:sessionId`
 
-Get metadata for a specific session.
+Delete a session and all its data from MinIO storage.
 
 **Response:**
 ```json
 {
   "sessionId": "9de73868-722a-4f1e-9c17-080ae9683442",
-  "provider": "ClaudeAgentSDK",
-  "providerSessionId": "01JCQM8YXS8WC3VNBK0PXNFWW7",
-  "createdAt": "2025-11-15T22:33:35.123Z",
-  "updatedAt": "2025-11-15T22:33:42.844Z",
-  "github": {
-    "repoUrl": "https://github.com/webedt/hello-world.git",
-    "branch": "main",
-    "clonedPath": "/tmp/session-9de73868-722a-4f1e-9c17-080ae9683442/hello-world"
-  }
+  "deleted": true,
+  "containerId": "abc123def456"
 }
 ```
 
 **Status Codes:**
-- `200` - Success
-- `404` - Session not found
-
----
-
-### 6. Get Session Stream Events
-
-**GET** `/sessions/:sessionId/stream`
-
-Retrieve the stream events (SSE history) for a session.
-
-**Response:**
-
-Array of SSE events that occurred during the session execution.
-
-```json
-[
-  {
-    "type": "connected",
-    "sessionId": "9de73868-722a-4f1e-9c17-080ae9683442",
-    "timestamp": "2025-11-15T22:33:35.123Z"
-  },
-  {
-    "type": "session_name",
-    "sessionName": "Add a hello.txt file with a greeting",
-    "branchName": "webedt/add-a-hello-txt-file-with-a-greeting-9de73868",
-    "timestamp": "2025-11-15T22:33:35.456Z"
-  },
-  {
-    "type": "completed",
-    "sessionId": "9de73868-722a-4f1e-9c17-080ae9683442",
-    "duration_ms": 7600,
-    "timestamp": "2025-11-15T22:33:42.723Z"
-  }
-]
-```
-
-**Status Codes:**
-- `200` - Success
-- `404` - Session not found
+- `200` - Successfully deleted
+- `500` - Internal error (failed to delete session)
 
 ---
 
@@ -418,7 +387,9 @@ All errors follow this format:
 
 ## Authentication Formats
 
-### ClaudeAgentSDK
+### Claude Code
+
+For the `claude-code` provider, use Claude OAuth credentials:
 
 ```json
 {
@@ -441,13 +412,17 @@ To obtain Claude OAuth credentials:
 
 See [CREDENTIALS.md](CREDENTIALS.md) for detailed instructions.
 
-### Codex (Coming Soon)
+### Codex / Cursor
+
+For `codex` or `cursor` providers:
 
 ```json
 {
-  "apiKey": "your-codex-api-key"
+  "apiKey": "your-api-key"
 }
 ```
+
+Note: Codex and Cursor providers are currently stubs and not fully implemented.
 
 ---
 
@@ -471,11 +446,56 @@ sessions/
 └── session-{uuid}/
     ├── .session-metadata.json    # Session metadata
     ├── .stream-events.jsonl      # SSE event log (JSONL format)
-    ├── .claude/                  # Claude state (if using ClaudeAgentSDK)
+    ├── .claude/                  # Claude state (if using claude-code provider)
     └── {repo-name}/              # Cloned repository (if GitHub integration used)
 ```
 
 Sessions persist across worker restarts and can be resumed using `resumeSessionId`.
+
+---
+
+## Image Support
+
+The worker supports multimodal requests with images for the `claude-code` provider. You can send images alongside text in your requests.
+
+**Supported Image Formats:**
+- `image/jpeg` - JPEG images
+- `image/png` - PNG images
+- `image/gif` - GIF images
+- `image/webp` - WebP images
+
+All images must be base64-encoded.
+
+**Example with Image:**
+
+```json
+{
+  "userRequest": [
+    {
+      "type": "text",
+      "text": "What's in this screenshot? Please analyze and fix any issues."
+    },
+    {
+      "type": "image",
+      "source": {
+        "type": "base64",
+        "media_type": "image/png",
+        "data": "iVBORw0KGgoAAAANSUhEUg..."
+      }
+    }
+  ],
+  "codingAssistantProvider": "claude-code",
+  "codingAssistantAuthentication": {
+    "claudeAiOauth": { "..." }
+  }
+}
+```
+
+**Use Cases:**
+- Screenshot analysis and debugging
+- Design implementation from mockups
+- Error debugging with visual context
+- Documentation with diagrams or charts
 
 ---
 
@@ -484,8 +504,8 @@ Sessions persist across worker restarts and can be resumed using `resumeSessionI
 See the `test-*.json` files in the repository for more examples:
 - `test-request.json` - Basic execution
 - `test-github.json` - GitHub integration
-- `test-github-autocommit.json` - GitHub with auto-commit
 - `test-resume.json` - Resume existing session
+- `test-image-request.json.example` - Image support example
 
 ---
 
