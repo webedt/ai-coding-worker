@@ -285,10 +285,10 @@ export class Orchestrator {
         }
       );
 
-      // Step 6.5: Auto-commit changes (if enabled and GitHub session)
-      const shouldAutoCommit = request.github && (request.autoCommit !== false); // Default true for GitHub repos
+      // Step 6.5: Auto-commit changes (always enabled for GitHub sessions)
+      const shouldAutoCommit = !!metadata.github;
 
-      if (shouldAutoCommit && metadata.github) {
+      if (shouldAutoCommit) {
         try {
           const repoPath = path.join(this.tmpDir, `session-${sessionId}`, metadata.github.clonedPath);
           const gitHelper = new GitHelper(repoPath);

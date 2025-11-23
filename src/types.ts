@@ -44,9 +44,6 @@ export interface ExecuteRequest {
     refreshToken?: string;
   };
 
-  // Optional: Auto-commit after execution (default: true for GitHub repos)
-  autoCommit?: boolean;
-
   // Optional: Database persistence
   database?: {
     sessionId: string;
